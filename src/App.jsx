@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 // Replace with your live Render URL if deployed (e.g., https://meetra-backend.onrender.com/api/v1)
-const API_BASE = "https://meetra-backend.onrender.com/api/v1";
+const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home'); // home | outing | chat | profile
