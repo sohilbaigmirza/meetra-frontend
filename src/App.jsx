@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home as HomeIcon, 
   Compass, 
@@ -14,16 +14,13 @@ import {
   Clock,
   IndianRupee,
   Navigation,
-  Coffee,
-  UtensilsCrossed,
-  Layers
+  Check
 } from 'lucide-react';
 
-// Replace with your live Render URL if deployed (e.g., https://meetra-backend.onrender.com/api/v1)
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home'); // home | outing | chat | profile
+  const [activeTab, setActiveTab] = useState('home');
   
   // Plan generator form states
   const [hours, setHours] = useState(3);
@@ -31,12 +28,33 @@ export default function App() {
   const [location, setLocation] = useState('College Main Gate');
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
-  const [mode, setMode] = useState('match'); // 'solo' | 'match'
+  const [mode, setMode] = useState('match');
   
-  // Output state
+  // App state
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [plan, setPlan] = useState(null);
   const [invitedPeers, setInvitedPeers] = useState([]);
+  
+  // Real database outings
+  const [savedOutings, setSavedOutings] = useState([]);
+
+  // Fetch all saved outings from Neon DB via FastAPI on load
+  const fetchOutings = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/outings`);
+      if (res.ok) {
+        const data = await res.json();
+        setSavedOutings(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch outings from DB:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchOutings();
+  }, []);
 
   const toggleInterest = (tag) => {
     setSelectedInterests(prev => 
@@ -44,6 +62,7 @@ export default function App() {
     );
   };
 
+  // 1. Generate Itinerary (Calculation)
   const handleGeneratePlan = async () => {
     setLoading(true);
     try {
@@ -59,33 +78,54 @@ export default function App() {
           is_solo: mode === 'solo'
         })
       });
-      if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setPlan(data);
       setActiveTab('outing');
     } catch (err) {
-      console.warn("Backend offline or waking up. Using fallback dataset:", err);
-      // Realistic fallback based on your requirements
-      setPlan({
-        id: Date.now(),
-        title: `${outingType} Experience`,
-        total_cost: budget,
-        est_duration: `${hours} hours`,
-        timeline: [
-          { time: "2:00 PM", title: location, category: "Start Point", est_cost: 0, activity: "Assemble & E-Rickshaw" },
-          { time: "2:30 PM", title: "Hidden Terrace Cafe", category: "Cafes", est_cost: Math.round(budget * 0.55), activity: "Chai / Cold Brew & Discussions" },
-          { time: "4:00 PM", title: "Heritage Market Lane", category: "Explore", est_cost: Math.round(budget * 0.35), activity: "Street Bites & Casual Walk" },
-          { time: "5:00 PM", title: "College Campus", category: "Return", est_cost: Math.round(budget * 0.10), activity: "Back to Base" }
-        ],
-        match_score: mode === 'match' ? 94 : null,
-        potential_peers: mode === 'match' ? [
-          { id: 1, name: "Aarav Sharma", college: "CSE '28", interests: ["Food", "Cafes"], rating: 4.9, collabs: 7 },
-          { id: 2, name: "Sneha Patel", college: "ECE '28", interests: ["Cafes", "Photography"], rating: 4.8, collabs: 4 }
-        ] : []
-      });
-      setActiveTab('outing');
+      console.error("Generator error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 2. Persist to PostgreSQL Database via FastAPI
+  const handleConfirmAndSave = async () => {
+    if (!plan) return;
+    setSaving(true);
+    try {
+      const payload = {
+        title: plan.title,
+        category: outingType,
+        distance: "3.5 km",
+        travel_mode: "E-Rickshaw / Walk",
+        event_time: `${plan.est_duration} window`,
+        total_expense: plan.total_cost,
+        expense_breakdown: {
+          transit: 40,
+          activities_and_food: plan.total_cost - 40
+        },
+        tags: selectedInterests,
+        max_seats: 4,
+        is_solo: mode === 'solo',
+        created_by: "Sohil Mirza"
+      };
+
+      const res = await fetch(`${API_BASE}/outings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        await fetchOutings(); // Refresh DB list
+        alert("Plan locked and saved to database!");
+        setActiveTab('home');
+      }
+    } catch (err) {
+      console.error("Failed to save to database:", err);
+      alert("Error saving to database.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -117,9 +157,9 @@ export default function App() {
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 px-4 py-5 overflow-y-auto pb-24">
+      <main className="flex-1 px-4 py-5 overflow-y-auto pb-24 space-y-4">
         
-        {/* ==================== HOME SCREEN ==================== */}
+        {/* ==================== HOME TAB ==================== */}
         {activeTab === 'home' && (
           <div className="space-y-4">
             
@@ -133,6 +173,31 @@ export default function App() {
                 Zero awkward plans. Input your free hours and pocket cash to build a custom outing.
               </p>
             </div>
+
+            {/* Saved Outings From Neon Database */}
+            {savedOutings.length > 0 && (
+              <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#000]">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Locked Database Plans ({savedOutings.length})
+                  </h3>
+                  <span className="text-[10px] font-black px-2 py-0.5 bg-emerald-100 border border-slate-900 rounded-md">Neon DB</span>
+                </div>
+                <div className="space-y-2">
+                  {savedOutings.slice(0, 3).map((item) => (
+                    <div key={item.id} className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl flex justify-between items-center shadow-[2px_2px_0px_#000]">
+                      <div>
+                        <p className="text-xs font-black text-slate-900">{item.title}</p>
+                        <p className="text-[10px] text-slate-500 font-bold">{item.category} • By {item.created_by}</p>
+                      </div>
+                      <span className="text-xs font-black text-[#4D96FF] bg-white border border-slate-900 px-2 py-1 rounded-lg">
+                        ₹{item.total_expense}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Plan Generator Form Card */}
             <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
@@ -245,7 +310,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== OUTING / ITINERARY SCREEN ==================== */}
+        {/* ==================== OUTING TAB ==================== */}
         {activeTab === 'outing' && (
           <div className="space-y-4">
             {plan ? (
@@ -286,14 +351,12 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Match Results (If not Solo) */}
+                {/* Match Results */}
                 {mode === 'match' && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-[#FF6B6B]" /> Compatible Peers ({plan.match_score}%)
-                      </span>
-                    </div>
+                    <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
+                      <Users className="w-4 h-4 text-[#FF6B6B]" /> Compatible Peers ({plan.match_score}%)
+                    </span>
 
                     <div className="space-y-2">
                       {plan.potential_peers.map((peer) => {
@@ -328,14 +391,18 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Solo Switch Banner */}
-                {mode === 'solo' && (
-                  <div className="mt-5 p-3.5 bg-sky-50 border-2 border-slate-900 rounded-xl">
-                    <p className="text-xs font-bold text-slate-900">
-                      💡 <strong>Going Solo:</strong> Plan saved. You can toggle this to an open collab anytime during your trip.
-                    </p>
-                  </div>
-                )}
+                {/* Confirm & Save to Neon DB Button */}
+                <div className="mt-6 pt-4 border-t-2 border-slate-100">
+                  <button
+                    disabled={saving}
+                    onClick={handleConfirmAndSave}
+                    className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition flex items-center justify-center gap-2"
+                  >
+                    {saving ? "Saving to Database..." : "Confirm & Lock Plan"}
+                    <Check className="w-4 h-4" />
+                  </button>
+                </div>
+
               </div>
             ) : (
               <div className="text-center py-16 bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000]">
@@ -353,7 +420,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== CHAT SCREEN ==================== */}
+        {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] text-center py-16 space-y-3">
             <MessageSquare className="w-12 h-12 text-slate-300 mx-auto" />
@@ -364,11 +431,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== PROFILE SCREEN ==================== */}
+        {/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
-            
-            {/* Header / Avatar */}
             <div className="flex items-center gap-3 pb-3 border-b-2 border-slate-100">
               <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
                 SM
@@ -383,16 +448,14 @@ export default function App() {
               </div>
             </div>
 
-            {/* Strict Notice as per requirements */}
             <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-xl text-[11px] font-bold text-rose-900">
               📌 Profile purpose: Exclusively for <strong>outing collaboration compatibility</strong>, punctuality, and mutual hobby matching (Not for dating).
             </div>
 
-            {/* Metrics */}
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
-                <p className="text-xl font-black text-slate-900">8</p>
-                <p className="text-[10px] font-bold text-slate-500 uppercase">Completed Outings</p>
+                <p className="text-xl font-black text-slate-900">{savedOutings.length}</p>
+                <p className="text-[10px] font-bold text-slate-500 uppercase">Created Plans</p>
               </div>
               <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
                 <p className="text-xl font-black text-[#6BCB77]">14</p>
@@ -400,7 +463,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Preferences */}
             <div>
               <span className="text-xs font-black text-slate-800 uppercase block mb-1.5">Preferred Outing Types</span>
               <div className="flex flex-wrap gap-1.5">
@@ -416,9 +478,8 @@ export default function App() {
 
       </main>
 
-      {/* ==================== BOTTOM NAVIGATION BAR ==================== */}
+      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 max-w-md w-full bg-white border-t-2 border-slate-900 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0px_-2px_0px_#000]">
-        
         <button 
           onClick={() => setActiveTab('home')}
           className={`flex flex-col items-center gap-0.5 text-[11px] font-black transition ${
