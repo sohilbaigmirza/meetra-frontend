@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Home as HomeIcon, 
   Compass, 
@@ -11,11 +11,11 @@ import {
   ShieldCheck,
   CheckCircle2,
   Clock,
-  IndianRupee,
   Navigation,
   Check,
   Edit3,
-  X
+  X,
+  Send
 } from 'lucide-react';
 
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
@@ -23,20 +23,20 @@ const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   
-  // User Profile State (persisted in LocalStorage & Neon DB)
+  // User Profile State
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('meetra_user');
     return saved ? JSON.parse(saved) : {
-      id: null,
-      name: "Sohil Mirza",
-      college: "ITM University",
+      id: 1,
+      name: "Sumit",
+      college: "MITS",
       branch: "CSE '28",
       bio: "Up for quick street food trails & weekend cafes.",
       interests: ["Food", "Cafes"],
       preferred_outing_types: ["Budget Cafes", "Heritage Walk"],
       budget_preference: 300,
-      rating: 4.9,
-      collabs_completed: 8
+      rating: 5.0,
+      collabs_completed: 0
     };
   });
 
@@ -45,21 +45,27 @@ export default function App() {
 
   // Generator form states
   const [hours, setHours] = useState(3);
-  const [budget, setBudget] = useState(userProfile.budget_preference || 250);
+  const [budget, setBudget] = useState(userProfile.budget_preference || 300);
   const [location, setLocation] = useState('College Main Gate');
   const [selectedInterests, setSelectedInterests] = useState(userProfile.interests || ['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
   const [mode, setMode] = useState('match');
-  const [collabRequests, setCollabRequests] = useState([]);
-
-  // App operational state
+  
+  // Operational state
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [plan, setPlan] = useState(null);
   const [invitedPeers, setInvitedPeers] = useState([]);
   const [savedOutings, setSavedOutings] = useState([]);
+  const [collabRequests, setCollabRequests] = useState([]);
 
-  // Fetch Outings from PostgreSQL
+  // Chat State
+  const [activeChatCollab, setActiveChatCollab] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessageText, setNewMessageText] = useState("");
+  const chatBottomRef = useRef(null);
+
+  // Fetch Outings
   const fetchOutings = async () => {
     try {
       const res = await fetch(`${API_BASE}/outings`);
@@ -72,9 +78,57 @@ export default function App() {
     }
   };
 
+  // Fetch Collab Requests
+  const fetchCollabs = async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/collabs/user/${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCollabRequests(data);
+        // If an accepted collab exists, set it as active chat
+        const accepted = data.find(c => c.status === 'accepted');
+        if (accepted) {
+          setActiveChatCollab(accepted);
+        }
+      }
+    } catch (err) {
+      console.error("Collabs fetch error:", err);
+    }
+  };
+
+  // Fetch Chat Messages
+  const fetchMessages = async (collabId) => {
+    if (!collabId) return;
+    try {
+      const res = await fetch(`${API_BASE}/chat/${collabId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch (err) {
+      console.error("Chat fetch error:", err);
+    }
+  };
+
   useEffect(() => {
     fetchOutings();
-  }, []);
+    if (userProfile?.id) {
+      fetchCollabs(userProfile.id);
+    }
+  }, [userProfile?.id]);
+
+  useEffect(() => {
+    if (activeChatCollab && activeTab === 'chat') {
+      fetchMessages(activeChatCollab.id);
+      const interval = setInterval(() => fetchMessages(activeChatCollab.id), 4000);
+      return () => clearInterval(interval);
+    }
+  }, [activeChatCollab, activeTab]);
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const toggleInterest = (tag) => {
     setSelectedInterests(prev => 
@@ -82,7 +136,7 @@ export default function App() {
     );
   };
 
-  // Save Profile to Neon DB
+  // Save Profile
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -104,35 +158,15 @@ export default function App() {
         setUserProfile(updated);
         localStorage.setItem('meetra_user', JSON.stringify(updated));
         setIsEditingProfile(false);
+        fetchCollabs(updated.id);
         alert("Profile saved to database!");
       }
     } catch (err) {
-      console.error("Failed to save profile:", err);
+      console.error("Profile save error:", err);
     }
   };
 
-//  collab setch
-const fetchCollabs = async (userId) => {
-  if (!userId) return;
-  try {
-    const res = await fetch(`${API_BASE}/collabs/user/${userId}`);
-    if (res.ok) {
-      const data = await res.json();
-      setCollabRequests(data);
-    }
-  } catch (err) {
-    console.error("Collabs fetch error:", err);
-  }
-};
-
-useEffect(() => {
-  fetchOutings();
-  if (userProfile?.id) {
-    fetchCollabs(userProfile.id);
-  }
-}, [userProfile?.id]);
-
-  // 1. Generate Smart Itinerary
+  // Generate Plan
   const handleGeneratePlan = async () => {
     setLoading(true);
     try {
@@ -158,7 +192,7 @@ useEffect(() => {
     }
   };
 
-  // 2. Lock & Persist Plan to Neon DB with Active User Identity
+  // Lock & Save Outing
   const handleConfirmAndSave = async () => {
     if (!plan) return;
     setSaving(true);
@@ -170,10 +204,7 @@ useEffect(() => {
         travel_mode: budget < 300 ? "E-Rickshaw / Walk" : "Rapido / Cab",
         event_time: `${plan.est_duration} window`,
         total_expense: plan.total_cost,
-        expense_breakdown: {
-          transit: 30,
-          activities_and_food: plan.total_cost - 30
-        },
+        expense_breakdown: { transit: 30, activities_and_food: plan.total_cost - 30 },
         tags: selectedInterests,
         max_seats: 4,
         is_solo: mode === 'solo',
@@ -193,21 +224,19 @@ useEffect(() => {
         setActiveTab('home');
       }
     } catch (err) {
-      console.error("Database save failed:", err);
+      console.error("Save error:", err);
     } finally {
       setSaving(false);
     }
   };
 
-const handleSendInvite = async (peer) => {
+  // Send Collab Invite
+  const handleSendInvite = async (peer) => {
     if (!userProfile?.id) {
-      alert("Please edit and save your profile first to get an active student ID.");
+      alert("Please save your profile first!");
       return;
     }
-
-    // Use active plan id or fallback to the most recent outing in DB
     const activeOutingId = plan?.id || (savedOutings.length > 0 ? savedOutings[0].id : 1);
-
     try {
       const res = await fetch(`${API_BASE}/collabs`, {
         method: 'POST',
@@ -226,28 +255,58 @@ const handleSendInvite = async (peer) => {
         setInvitedPeers(prev => [...prev, peer.id]);
         await fetchCollabs(userProfile.id);
         alert(`Invite sent to ${peer.name}!`);
-      } else {
-        console.error("Failed to send invite, status:", res.status);
       }
     } catch (err) {
-      console.error("Invite send error:", err);
+      console.error("Invite error:", err);
     }
   };
 
-const handleRespondCollab = async (collabId, status) => {
-  try {
-    const res = await fetch(`${API_BASE}/collabs/${collabId}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status })
-    });
-    if (res.ok) {
-      fetchCollabs(userProfile.id);
+  // Accept/Decline Collab
+  const handleRespondCollab = async (collabId, status) => {
+    try {
+      const res = await fetch(`${API_BASE}/collabs/${collabId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        await fetchCollabs(userProfile.id);
+        if (status === 'accepted') {
+          setActiveChatCollab(updated);
+          setActiveTab('chat');
+        }
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
     }
-  } catch (err) {
-    console.error("Status update error:", err);
-  }
-};
+  };
+
+  // Send Chat Message
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessageText.trim() || !activeChatCollab) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collab_id: activeChatCollab.id,
+          sender_id: userProfile.id,
+          sender_name: userProfile.name,
+          text: newMessageText.trim()
+        })
+      });
+
+      if (res.ok) {
+        setNewMessageText("");
+        fetchMessages(activeChatCollab.id);
+      }
+    } catch (err) {
+      console.error("Message send error:", err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-between max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
@@ -257,9 +316,7 @@ const handleRespondCollab = async (collabId, status) => {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl font-black tracking-tight text-slate-900">MeetRa</span>
-            <span className="text-[10px] bg-[#FF6B6B] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">
-              GEN-Z
-            </span>
+            <span className="text-[10px] bg-[#FF6B6B] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">GEN-Z</span>
           </div>
           <p className="text-[11px] text-slate-500 font-bold">College Outings & Compatibility</p>
         </div>
@@ -290,42 +347,38 @@ const handleRespondCollab = async (collabId, status) => {
                 Zero awkward plans. Input your free hours and pocket cash to build a custom outing.
               </p>
             </div>
-            {collabRequests.filter(r => r.status === 'pending' && r.receiver_id === userProfile.id).length > 0 && (
-  <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#FF6B6B] space-y-3">
-    <div className="flex items-center justify-between">
-      <span className="text-xs font-black uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
-        <Sparkles className="w-4 h-4" /> Collab Request Received!
-      </span>
-      <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 border border-slate-900 rounded-md">
-        Pending
-      </span>
-    </div>
-    {collabRequests.filter(r => r.status === 'pending' && r.receiver_id === userProfile.id).map(req => (
-      <div key={req.id} className="p-3 bg-rose-50/60 border border-slate-900 rounded-xl flex items-center justify-between">
-        <div>
-          <p className="text-xs font-black text-slate-900">{req.sender_name}</p>
-          <p className="text-[10px] font-bold text-slate-600">Compatibility: {req.match_percentage}% Match</p>
-        </div>
-        <div className="flex gap-1.5">
-          <button 
-            onClick={() => handleRespondCollab(req.id, 'accepted')}
-            className="px-2.5 py-1 text-xs font-black bg-emerald-500 text-white rounded-lg border border-slate-900"
-          >
-            Accept
-          </button>
-          <button 
-            onClick={() => handleRespondCollab(req.id, 'rejected')}
-            className="px-2.5 py-1 text-xs font-black bg-slate-200 text-slate-700 rounded-lg border border-slate-900"
-          >
-            Decline
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
-)}
 
-            {/* Saved Outings Feed */}
+            {/* Pending Requests Alert */}
+            {collabRequests.filter(r => r.status === 'pending').length > 0 && (
+              <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#FF6B6B] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4" /> Active Collab Requests
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 border border-slate-900 rounded-md">Pending</span>
+                </div>
+                {collabRequests.filter(r => r.status === 'pending').map(req => (
+                  <div key={req.id} className="p-3 bg-rose-50/60 border-2 border-slate-900 rounded-xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-black text-slate-900">
+                        {req.sender_id === userProfile.id ? `Invited: ${req.receiver_name}` : `From: ${req.sender_name}`}
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-600">Match Score: {req.match_percentage}%</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button 
+                        onClick={() => handleRespondCollab(req.id, 'accepted')}
+                        className="px-2.5 py-1 text-xs font-black bg-emerald-500 text-white rounded-lg border border-slate-900"
+                      >
+                        Accept & Chat
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Outings Feed */}
             {savedOutings.length > 0 && (
               <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#000]">
                 <div className="flex items-center justify-between mb-3">
@@ -350,7 +403,7 @@ const handleRespondCollab = async (collabId, status) => {
               </div>
             )}
 
-            {/* Generator Form */}
+            {/* Form */}
             <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#FF6B6B]" /> Plan Your Outing
@@ -359,37 +412,23 @@ const handleRespondCollab = async (collabId, status) => {
               <div>
                 <div className="flex justify-between items-center text-xs font-black text-slate-800 mb-1">
                   <span>How much time?</span>
-                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-[#FF6B6B]">
-                    {hours} Hours
-                  </span>
+                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-[#FF6B6B]">{hours} Hours</span>
                 </div>
-                <input 
-                  type="range" min="1" max="8" value={hours} 
-                  onChange={(e) => setHours(e.target.value)}
-                  className="w-full accent-slate-900"
-                />
+                <input type="range" min="1" max="8" value={hours} onChange={(e) => setHours(e.target.value)} className="w-full accent-slate-900" />
               </div>
 
               <div>
                 <div className="flex justify-between items-center text-xs font-black text-slate-800 mb-1">
                   <span>Pocket Budget</span>
-                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-[#4D96FF]">
-                    ₹{budget}
-                  </span>
+                  <span className="px-2 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-[#4D96FF]">₹{budget}</span>
                 </div>
-                <input 
-                  type="range" min="100" max="1500" step="50" value={budget} 
-                  onChange={(e) => setBudget(e.target.value)}
-                  className="w-full accent-slate-900"
-                />
+                <input type="range" min="100" max="1500" step="50" value={budget} onChange={(e) => setBudget(e.target.value)} className="w-full accent-slate-900" />
               </div>
 
               <div>
                 <label className="text-xs font-black text-slate-800 block mb-1">Start Location</label>
                 <input 
-                  type="text" 
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
+                  type="text" value={location} onChange={(e) => setLocation(e.target.value)}
                   className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border-2 border-slate-900 rounded-xl focus:bg-white focus:outline-none"
                 />
               </div>
@@ -399,13 +438,9 @@ const handleRespondCollab = async (collabId, status) => {
                 <div className="flex flex-wrap gap-1.5">
                   {['Food', 'Cafes', 'Heritage', 'Adventure', 'Nature', 'Budget'].map(tag => (
                     <button
-                      key={tag}
-                      type="button"
-                      onClick={() => toggleInterest(tag)}
+                      key={tag} type="button" onClick={() => toggleInterest(tag)}
                       className={`text-xs font-black px-3 py-1.5 rounded-xl border-2 border-slate-900 transition ${
-                        selectedInterests.includes(tag) 
-                          ? 'bg-[#FF6B6B] text-white shadow-[2px_2px_0px_#000]' 
-                          : 'bg-white text-slate-700'
+                        selectedInterests.includes(tag) ? 'bg-[#FF6B6B] text-white shadow-[2px_2px_0px_#000]' : 'bg-white text-slate-700'
                       }`}
                     >
                       #{tag}
@@ -418,8 +453,7 @@ const handleRespondCollab = async (collabId, status) => {
                 <label className="text-xs font-black text-slate-800 block mb-1.5">Outing Preference</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    type="button"
-                    onClick={() => setMode('solo')}
+                    type="button" onClick={() => setMode('solo')}
                     className={`py-2 text-xs font-black rounded-xl border-2 border-slate-900 transition ${
                       mode === 'solo' ? 'bg-[#4D96FF] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
                     }`}
@@ -427,8 +461,7 @@ const handleRespondCollab = async (collabId, status) => {
                     Go Solo
                   </button>
                   <button
-                    type="button"
-                    onClick={() => setMode('match')}
+                    type="button" onClick={() => setMode('match')}
                     className={`py-2 text-xs font-black rounded-xl border-2 border-slate-900 transition ${
                       mode === 'match' ? 'bg-[#6BCB77] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
                     }`}
@@ -439,8 +472,7 @@ const handleRespondCollab = async (collabId, status) => {
               </div>
 
               <button
-                disabled={loading}
-                onClick={handleGeneratePlan}
+                disabled={loading} onClick={handleGeneratePlan}
                 className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#FF6B6B] active:translate-x-0.5 active:translate-y-0.5 transition flex items-center justify-center gap-2 mt-2"
               >
                 {loading ? "Calculating Custom Itinerary..." : "Create My Plan"}
@@ -468,7 +500,6 @@ const handleRespondCollab = async (collabId, status) => {
                   </div>
                 </div>
 
-                {/* Timeline */}
                 <div className="mt-5 space-y-4 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-200">
                   {plan.timeline.map((stop, idx) => (
                     <div key={idx} className="relative flex items-start gap-3 pl-1">
@@ -477,9 +508,7 @@ const handleRespondCollab = async (collabId, status) => {
                       </div>
                       <div className="bg-slate-50 border-2 border-slate-900 rounded-xl p-3 flex-1 shadow-[2px_2px_0px_#000]">
                         <div className="flex justify-between text-[11px] font-bold text-slate-500">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-slate-400" /> {stop.time}
-                          </span>
+                          <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-slate-400" /> {stop.time}</span>
                           <span className="text-emerald-700">~₹{stop.est_cost}</span>
                         </div>
                         <h4 className="text-xs font-black text-slate-900 mt-1">{stop.title}</h4>
@@ -489,7 +518,6 @@ const handleRespondCollab = async (collabId, status) => {
                   ))}
                 </div>
 
-                {/* Matching Candidates */}
                 {mode === 'match' && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
@@ -497,19 +525,12 @@ const handleRespondCollab = async (collabId, status) => {
                     </span>
                     <div className="space-y-2">
                       {plan.potential_peers.map((peer) => {
-                        const isInvited = invitedPeers.includes(peer.id);
+                        const isInvited = invitedPeers.includes(peer.id) || collabRequests.some(c => c.receiver_id === peer.id);
                         return (
                           <div key={peer.id} className="flex items-center justify-between p-3 bg-amber-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
                             <div>
                               <p className="text-xs font-black text-slate-900">{peer.name}</p>
                               <p className="text-[10px] text-slate-600 font-bold">{peer.college} • {peer.collabs} Collabs</p>
-                              <div className="flex gap-1 mt-1">
-                                {peer.interests.map(t => (
-                                  <span key={t} className="text-[9px] font-bold px-1.5 bg-white border border-slate-900 rounded">
-                                    #{t}
-                                  </span>
-                                ))}
-                              </div>
                             </div>
                             <button 
                               onClick={() => handleSendInvite(peer)}
@@ -528,8 +549,7 @@ const handleRespondCollab = async (collabId, status) => {
 
                 <div className="mt-6 pt-4 border-t-2 border-slate-100">
                   <button
-                    disabled={saving}
-                    onClick={handleConfirmAndSave}
+                    disabled={saving} onClick={handleConfirmAndSave}
                     className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition flex items-center justify-center gap-2"
                   >
                     {saving ? "Saving to Database..." : `Confirm & Lock Plan (as ${userProfile.name})`}
@@ -541,11 +561,7 @@ const handleRespondCollab = async (collabId, status) => {
               <div className="text-center py-16 bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000]">
                 <Navigation className="w-10 h-10 text-slate-400 mx-auto mb-2" />
                 <h4 className="text-sm font-black text-slate-900 uppercase">No Active Outing</h4>
-                <p className="text-xs text-slate-500 mt-1 font-semibold">Generate a fresh itinerary from the Home tab.</p>
-                <button 
-                  onClick={() => setActiveTab('home')}
-                  className="mt-4 px-4 py-2 bg-slate-900 text-white text-xs font-black rounded-xl border border-slate-900"
-                >
+                <button onClick={() => setActiveTab('home')} className="mt-4 px-4 py-2 bg-slate-900 text-white text-xs font-black rounded-xl border border-slate-900">
                   Start Plan
                 </button>
               </div>
@@ -555,19 +571,83 @@ const handleRespondCollab = async (collabId, status) => {
 
         {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
-          <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] text-center py-16 space-y-3">
-            <MessageSquare className="w-12 h-12 text-slate-300 mx-auto" />
-            <h3 className="text-base font-black text-slate-900">Coordination Chats</h3>
-            <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium">
-              Real-time chats activate automatically once both students confirm and accept an outing invitation.
-            </p>
+          <div className="space-y-4">
+            {activeChatCollab ? (
+              <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
+                
+                {/* Combined Itinerary Header */}
+                <div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
+                      Combined Itinerary
+                    </span>
+                    <h4 className="text-xs font-black text-slate-900 mt-1">
+                      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
+                    </h4>
+                    <p className="text-[10px] text-slate-600 font-bold">Split: ₹150 / student • Meeting: Tapri Point</p>
+                  </div>
+                  <span className="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg border border-slate-900">
+                    Active Collab
+                  </span>
+                </div>
+
+                {/* Message Log */}
+                <div className="flex-1 p-3 overflow-y-auto space-y-2 bg-[#FDFBF7]">
+                  {messages.length === 0 ? (
+                    <div className="text-center py-10 text-slate-400 text-xs font-bold">
+                      Coordination chat open! Say hello and pick your meeting time.
+                    </div>
+                  ) : (
+                    messages.map((m) => {
+                      const isMe = m.sender_id === userProfile.id;
+                      return (
+                        <div key={m.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                          <span className="text-[9px] font-bold text-slate-500 mb-0.5">{m.sender_name}</span>
+                          <div className={`p-2.5 rounded-xl max-w-[75%] text-xs font-bold border-2 border-slate-900 shadow-[2px_2px_0px_#000] ${
+                            isMe ? 'bg-[#4D96FF] text-white' : 'bg-white text-slate-900'
+                          }`}>
+                            {m.text}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                  <div ref={chatBottomRef} />
+                </div>
+
+                {/* Message Input */}
+                <form onSubmit={handleSendMessage} className="p-2 bg-white border-t-2 border-slate-900 flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Type meetup details..."
+                    value={newMessageText}
+                    onChange={(e) => setNewMessageText(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs font-semibold bg-slate-50 border-2 border-slate-900 rounded-xl focus:bg-white focus:outline-none"
+                  />
+                  <button 
+                    type="submit"
+                    className="p-2.5 bg-slate-900 text-white rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#FF6B6B]"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+
+              </div>
+            ) : (
+              <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] text-center py-16 space-y-3">
+                <MessageSquare className="w-12 h-12 text-slate-300 mx-auto" />
+                <h3 className="text-base font-black text-slate-900">No Active Chat Yet</h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium">
+                  Coordination chat unlocks as soon as an invitation is accepted on the Home tab.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         {/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
-            
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
@@ -583,10 +663,7 @@ const handleRespondCollab = async (collabId, status) => {
                 </div>
               </div>
               <button 
-                onClick={() => {
-                  setProfileForm(userProfile);
-                  setIsEditingProfile(true);
-                }}
+                onClick={() => { setProfileForm(userProfile); setIsEditingProfile(true); }}
                 className="p-2 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl shadow-[2px_2px_0px_#000]"
               >
                 <Edit3 className="w-4 h-4 text-slate-800" />
@@ -594,10 +671,6 @@ const handleRespondCollab = async (collabId, status) => {
             </div>
 
             <p className="text-xs font-semibold text-slate-700 italic">"{userProfile.bio}"</p>
-
-            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-xl text-[11px] font-bold text-rose-900">
-              📌 Profile purpose: Exclusively for <strong>outing collaboration compatibility</strong>, punctuality, and mutual hobby matching (Not for dating).
-            </div>
 
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
@@ -607,17 +680,6 @@ const handleRespondCollab = async (collabId, status) => {
               <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
                 <p className="text-xl font-black text-[#6BCB77]">{userProfile.collabs_completed}</p>
                 <p className="text-[10px] font-bold text-slate-500 uppercase">Collabs Completed</p>
-              </div>
-            </div>
-
-            <div>
-              <span className="text-xs font-black text-slate-800 uppercase block mb-1.5">My Outing Preferences</span>
-              <div className="flex flex-wrap gap-1.5">
-                {(userProfile.preferred_outing_types || []).map(item => (
-                  <span key={item} className="px-2.5 py-1 bg-slate-100 border border-slate-900 text-slate-800 text-[11px] font-bold rounded-lg">
-                    {item}
-                  </span>
-                ))}
               </div>
             </div>
           </div>
@@ -653,24 +715,6 @@ const handleRespondCollab = async (collabId, status) => {
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch / Year</label>
-                <input 
-                  type="text" required value={profileForm.branch}
-                  onChange={(e) => setProfileForm({...profileForm, branch: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
-                <input 
-                  type="text" value={profileForm.bio}
-                  onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-                />
-              </div>
-
               <button
                 type="submit"
                 className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77]"
@@ -684,42 +728,19 @@ const handleRespondCollab = async (collabId, status) => {
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 max-w-md w-full bg-white border-t-2 border-slate-900 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0px_-2px_0px_#000]">
-        <button 
-          onClick={() => setActiveTab('home')}
-          className={`flex flex-col items-center gap-0.5 text-[11px] font-black transition ${
-            activeTab === 'home' ? 'text-[#FF6B6B]' : 'text-slate-500'
-          }`}
-        >
+        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'home' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
           <HomeIcon className="w-5 h-5" />
           <span>Home</span>
         </button>
-
-        <button 
-          onClick={() => setActiveTab('outing')}
-          className={`flex flex-col items-center gap-0.5 text-[11px] font-black transition ${
-            activeTab === 'outing' ? 'text-[#FF6B6B]' : 'text-slate-500'
-          }`}
-        >
+        <button onClick={() => setActiveTab('outing')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'outing' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
           <Compass className="w-5 h-5" />
           <span>Outing</span>
         </button>
-
-        <button 
-          onClick={() => setActiveTab('chat')}
-          className={`flex flex-col items-center gap-0.5 text-[11px] font-black transition ${
-            activeTab === 'chat' ? 'text-[#FF6B6B]' : 'text-slate-500'
-          }`}
-        >
+        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'chat' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
           <MessageSquare className="w-5 h-5" />
           <span>Chat</span>
         </button>
-
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className={`flex flex-col items-center gap-0.5 text-[11px] font-black transition ${
-            activeTab === 'profile' ? 'text-[#FF6B6B]' : 'text-slate-500'
-          }`}
-        >
+        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'profile' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
           <UserIcon className="w-5 h-5" />
           <span>Profile</span>
         </button>
