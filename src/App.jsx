@@ -199,34 +199,40 @@ useEffect(() => {
     }
   };
 
-  const handleSendInvite = async (peer) => {
-  if (!userProfile?.id) {
-    alert("Please edit and save your profile first to get an active student ID.");
-    return;
-  }
-  
-  try {
-    const res = await fetch(`${API_BASE}/collabs`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        outing_id: plan?.id || 1,
-        sender_id: userProfile.id,
-        sender_name: userProfile.name,
-        receiver_id: peer.id,
-        receiver_name: peer.name,
-        match_percentage: plan?.match_score || 92
-      })
-    });
-
-    if (res.ok) {
-      setInvitedPeers(prev => [...prev, peer.id]);
-      await fetchCollabs(userProfile.id);
+const handleSendInvite = async (peer) => {
+    if (!userProfile?.id) {
+      alert("Please edit and save your profile first to get an active student ID.");
+      return;
     }
-  } catch (err) {
-    console.error("Invite send error:", err);
-  }
-};
+
+    // Use active plan id or fallback to the most recent outing in DB
+    const activeOutingId = plan?.id || (savedOutings.length > 0 ? savedOutings[0].id : 1);
+
+    try {
+      const res = await fetch(`${API_BASE}/collabs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          outing_id: activeOutingId,
+          sender_id: userProfile.id,
+          sender_name: userProfile.name,
+          receiver_id: peer.id,
+          receiver_name: peer.name,
+          match_percentage: plan?.match_score || 92
+        })
+      });
+
+      if (res.ok) {
+        setInvitedPeers(prev => [...prev, peer.id]);
+        await fetchCollabs(userProfile.id);
+        alert(`Invite sent to ${peer.name}!`);
+      } else {
+        console.error("Failed to send invite, status:", res.status);
+      }
+    } catch (err) {
+      console.error("Invite send error:", err);
+    }
+  };
 
 const handleRespondCollab = async (collabId, status) => {
   try {
