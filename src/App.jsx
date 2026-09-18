@@ -50,7 +50,8 @@ export default function App() {
   const [selectedInterests, setSelectedInterests] = useState(userProfile.interests || ['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
   const [mode, setMode] = useState('match');
-  
+  const [collabRequests, setCollabRequests] = useState([]);
+
   // App operational state
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -109,6 +110,27 @@ export default function App() {
       console.error("Failed to save profile:", err);
     }
   };
+
+//  collab setch
+const fetchCollabs = async (userId) => {
+  if (!userId) return;
+  try {
+    const res = await fetch(`${API_BASE}/collabs/user/${userId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setCollabRequests(data);
+    }
+  } catch (err) {
+    console.error("Collabs fetch error:", err);
+  }
+};
+
+useEffect(() => {
+  fetchOutings();
+  if (userProfile?.id) {
+    fetchCollabs(userProfile.id);
+  }
+}, [userProfile?.id]);
 
   // 1. Generate Smart Itinerary
   const handleGeneratePlan = async () => {
@@ -177,11 +199,49 @@ export default function App() {
     }
   };
 
-  const toggleInvite = (id) => {
-    setInvitedPeers(prev => 
-      prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]
-    );
-  };
+  const handleSendInvite = async (peer) => {
+  if (!userProfile?.id) {
+    alert("Please edit and save your profile first to get an active student ID.");
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE}/collabs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        outing_id: plan?.id || 1,
+        sender_id: userProfile.id,
+        sender_name: userProfile.name,
+        receiver_id: peer.id,
+        receiver_name: peer.name,
+        match_percentage: plan?.match_score || 92
+      })
+    });
+
+    if (res.ok) {
+      setInvitedPeers(prev => [...prev, peer.id]);
+      await fetchCollabs(userProfile.id);
+    }
+  } catch (err) {
+    console.error("Invite send error:", err);
+  }
+};
+
+const handleRespondCollab = async (collabId, status) => {
+  try {
+    const res = await fetch(`${API_BASE}/collabs/${collabId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) {
+      fetchCollabs(userProfile.id);
+    }
+  } catch (err) {
+    console.error("Status update error:", err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-between max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
@@ -224,6 +284,40 @@ export default function App() {
                 Zero awkward plans. Input your free hours and pocket cash to build a custom outing.
               </p>
             </div>
+            {collabRequests.filter(r => r.status === 'pending' && r.receiver_id === userProfile.id).length > 0 && (
+  <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#FF6B6B] space-y-3">
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-black uppercase tracking-wider text-rose-600 flex items-center gap-1.5">
+        <Sparkles className="w-4 h-4" /> Collab Request Received!
+      </span>
+      <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 border border-slate-900 rounded-md">
+        Pending
+      </span>
+    </div>
+    {collabRequests.filter(r => r.status === 'pending' && r.receiver_id === userProfile.id).map(req => (
+      <div key={req.id} className="p-3 bg-rose-50/60 border border-slate-900 rounded-xl flex items-center justify-between">
+        <div>
+          <p className="text-xs font-black text-slate-900">{req.sender_name}</p>
+          <p className="text-[10px] font-bold text-slate-600">Compatibility: {req.match_percentage}% Match</p>
+        </div>
+        <div className="flex gap-1.5">
+          <button 
+            onClick={() => handleRespondCollab(req.id, 'accepted')}
+            className="px-2.5 py-1 text-xs font-black bg-emerald-500 text-white rounded-lg border border-slate-900"
+          >
+            Accept
+          </button>
+          <button 
+            onClick={() => handleRespondCollab(req.id, 'rejected')}
+            className="px-2.5 py-1 text-xs font-black bg-slate-200 text-slate-700 rounded-lg border border-slate-900"
+          >
+            Decline
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+)}
 
             {/* Saved Outings Feed */}
             {savedOutings.length > 0 && (
@@ -412,7 +506,7 @@ export default function App() {
                               </div>
                             </div>
                             <button 
-                              onClick={() => toggleInvite(peer.id)}
+                              onClick={() => handleSendInvite(peer)}
                               className={`px-3 py-1.5 text-xs font-black rounded-lg border-2 border-slate-900 transition ${
                                 isInvited ? 'bg-emerald-500 text-white' : 'bg-[#FF6B6B] text-white shadow-[2px_2px_0px_#000]'
                               }`}
