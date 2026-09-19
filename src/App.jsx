@@ -66,46 +66,46 @@ export default function App() {
   const [newMessageText, setNewMessageText] = useState("");
   const chatBottomRef = useRef(null);
 
-  //Reviews
+  // Reviews
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [ratingScore, setRatingScore] = useState(5);
   const [selectedReviewTags, setSelectedReviewTags] = useState(["Punctual", "Friendly"]);
   const [reviewFeedback, setReviewFeedback] = useState("");
 
   const handleSubmitReview = async (e) => {
-  e.preventDefault();
-  if (!activeChatCollab) return;
+    e.preventDefault();
+    if (!activeChatCollab) return;
 
-  const peerId = activeChatCollab.sender_id === userProfile.id 
-    ? activeChatCollab.receiver_id 
-    : activeChatCollab.sender_id;
+    const peerId = activeChatCollab.sender_id === userProfile.id 
+      ? activeChatCollab.receiver_id 
+      : activeChatCollab.sender_id;
 
-  try {
-    const res = await fetch(`${API_BASE}/reviews`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        collab_id: activeChatCollab.id,
-        reviewer_id: userProfile.id,
-        reviewer_name: userProfile.name,
-        reviewee_id: peerId,
-        rating: Number(ratingScore),
-        tags: selectedReviewTags,
-        feedback: reviewFeedback
-      })
-    });
+    try {
+      const res = await fetch(`${API_BASE}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collab_id: activeChatCollab.id,
+          reviewer_id: userProfile.id,
+          reviewer_name: userProfile.name,
+          reviewee_id: peerId,
+          rating: Number(ratingScore),
+          tags: selectedReviewTags,
+          feedback: reviewFeedback
+        })
+      });
 
-    if (res.ok) {
-      alert("Outing marked complete! Peer rating updated.");
-      setShowReviewModal(false);
-      setActiveChatCollab(null);
-      fetchCollabs(userProfile.id);
-      setActiveTab('home');
+      if (res.ok) {
+        alert("Outing marked complete! Peer rating updated.");
+        setShowReviewModal(false);
+        setActiveChatCollab(null);
+        fetchCollabs(userProfile.id);
+        setActiveTab('home');
+      }
+    } catch (err) {
+      console.error("Review submission error:", err);
     }
-  } catch (err) {
-    console.error("Review submission error:", err);
-  }
-};
+  };
 
   // Fetch Outings
   const fetchOutings = async () => {
@@ -128,7 +128,6 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCollabRequests(data);
-        // If an accepted collab exists, set it as active chat
         const accepted = data.find(c => c.status === 'accepted');
         if (accepted) {
           setActiveChatCollab(accepted);
@@ -160,18 +159,18 @@ export default function App() {
     }
   }, [userProfile?.id]);
 
-  // AFTER: Relaxed interval + stops background fetching when tab is blurred
-useEffect(() => {
-  if (activeChatCollab && activeTab === 'chat') {
-    fetchMessages(activeChatCollab.id);
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchMessages(activeChatCollab.id);
-      }
-    }, 8000);
-    return () => clearInterval(interval);
-  }
-}, [activeChatCollab, activeTab]);
+  // Optimized Polling: 8s interval + pause on tab blur
+  useEffect(() => {
+    if (activeChatCollab && activeTab === 'chat') {
+      fetchMessages(activeChatCollab.id);
+      const interval = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          fetchMessages(activeChatCollab.id);
+        }
+      }, 8000);
+      return () => clearInterval(interval);
+    }
+  }, [activeChatCollab, activeTab]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -329,45 +328,43 @@ useEffect(() => {
     }
   };
 
-  // Send Chat Message
+  // Send Chat Message with Optimistic Update (Instant Rendering)
   const handleSendMessage = async (e) => {
-  e.preventDefault();
-  if (!newMessageText.trim() || !activeChatCollab) return;
+    e.preventDefault();
+    if (!newMessageText.trim() || !activeChatCollab) return;
 
-  const optimisticMsg = {
-    id: Date.now(),
-    collab_id: activeChatCollab.id,
-    sender_id: userProfile.id,
-    sender_name: userProfile.name,
-    text: newMessageText.trim(),
-    created_at: new Date().toISOString()
-  };
+    const optimisticMsg = {
+      id: Date.now(),
+      collab_id: activeChatCollab.id,
+      sender_id: userProfile.id,
+      sender_name: userProfile.name,
+      text: newMessageText.trim(),
+      created_at: new Date().toISOString()
+    };
 
-  // 1. Instantly render on screen (Zero Latency)
-  setMessages(prev => [...prev, optimisticMsg]);
-  const textToSend = newMessageText.trim();
-  setNewMessageText("");
+    setMessages(prev => [...prev, optimisticMsg]);
+    const textToSend = newMessageText.trim();
+    setNewMessageText("");
 
-  try {
-    const res = await fetch(`${API_BASE}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        collab_id: activeChatCollab.id,
-        sender_id: userProfile.id,
-        sender_name: userProfile.name,
-        text: textToSend
-      })
-    });
+    try {
+      const res = await fetch(`${API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collab_id: activeChatCollab.id,
+          sender_id: userProfile.id,
+          sender_name: userProfile.name,
+          text: textToSend
+        })
+      });
 
-    if (!res.ok) {
-      // Revert if failed
-      fetchMessages(activeChatCollab.id);
+      if (!res.ok) {
+        fetchMessages(activeChatCollab.id);
+      }
+    } catch (err) {
+      console.error("Message send error:", err);
     }
-  } catch (err) {
-    console.error("Message send error:", err);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-between max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
@@ -579,6 +576,7 @@ useEffect(() => {
                   ))}
                 </div>
 
+                {/* Peer List with clickable inspection modal */}
                 {mode === 'match' && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
@@ -589,9 +587,13 @@ useEffect(() => {
                         const isInvited = invitedPeers.includes(peer.id) || collabRequests.some(c => c.receiver_id === peer.id);
                         return (
                           <div key={peer.id} className="flex items-center justify-between p-3 bg-amber-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
-                            <div>
-                              <p className="text-xs font-black text-slate-900">{peer.name}</p>
+                            <div 
+                              onClick={() => setInspectingPeer(peer)} 
+                              className="cursor-pointer hover:opacity-80 transition"
+                            >
+                              <p className="text-xs font-black text-slate-900 underline decoration-slate-300">{peer.name}</p>
                               <p className="text-[10px] text-slate-600 font-bold">{peer.college} • {peer.collabs} Collabs</p>
+                              <span className="text-[9px] text-emerald-700 font-bold">Tap to view profile ↗</span>
                             </div>
                             <button 
                               onClick={() => handleSendInvite(peer)}
@@ -635,38 +637,32 @@ useEffect(() => {
           <div className="space-y-4">
             {activeChatCollab ? (
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
-                <button
-  onClick={() => setShowReviewModal(true)}
-  className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition"
->
-  Finish & Rate ✓
-</button>
-                <p className="text-[10px] text-slate-600 font-bold">
-  Meeting Point: {location.includes("Gate") ? "Campus Tapri Point" : `Midway Junction near ${location}`} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)} / student
-</p>
-{/* Combined Itinerary Header */}
-<div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
-  <div>
-    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
-      Combined Itinerary
-    </span>
-    <h4 className="text-xs font-black text-slate-900 mt-1">
-      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
-    </h4>
-    <p className="text-[10px] text-slate-600 font-bold">Split: ₹150 / student • Meeting: Tapri Point</p>
-  </div>
-  <div className="flex flex-col items-end gap-1.5">
-    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-slate-900">
-      Active Collab
-    </span>
-    <button
-      onClick={() => setShowReviewModal(true)}
-      className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
-    >
-      Finish & Rate ✓
-    </button>
-  </div>
-</div>
+                
+                {/* Combined Itinerary Header */}
+                <div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
+                      Combined Itinerary
+                    </span>
+                    <h4 className="text-xs font-black text-slate-900 mt-1">
+                      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
+                    </h4>
+                    <p className="text-[10px] text-slate-600 font-bold">
+                      Meeting Point: {location.includes("Gate") ? "Campus Tapri Point" : `Midway Junction near ${location}`} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)} / student
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-slate-900">
+                      Active Collab
+                    </span>
+                    <button
+                      onClick={() => setShowReviewModal(true)}
+                      className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
+                    >
+                      Finish & Rate ✓
+                    </button>
+                  </div>
+                </div>
 
                 {/* Message Log */}
                 <div className="flex-1 p-3 overflow-y-auto space-y-2 bg-[#FDFBF7]">
@@ -762,85 +758,70 @@ useEffect(() => {
           </div>
         )}
 
-        {inspectingPeer && (
-  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
-      
-      {/* Modal Header */}
-      <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100">
-        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-slate-900">
-          Campus Peer Verified
-        </span>
-        <button onClick={() => setInspectingPeer(null)}>
-          <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
-        </button>
-      </div>
+      </main>
 
-      // On the Peer List card:
-<div 
-  onClick={() => setInspectingPeer(peer)} 
-  className="cursor-pointer hover:opacity-80"
->
-  <p className="text-xs font-black text-slate-900 underline decoration-slate-300">{peer.name}</p>
-  ...
-</div>
+      {/* Inspecting Peer Modal (Feature #3) */}
+      {inspectingPeer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-slate-900">
+                Campus Peer Verified
+              </span>
+              <button onClick={() => setInspectingPeer(null)}>
+                <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+              </button>
+            </div>
 
-      {/* Identity Card */}
-      <div className="flex items-center gap-3">
-        <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
-          {inspectingPeer.name?.slice(0, 2).toUpperCase()}
-        </div>
-        <div>
-          <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
-          <p className="text-xs font-bold text-slate-500">{inspectingPeer.college || "Campus Member"}</p>
-          <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
-            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-            <span>{inspectingPeer.rating || 5.0} • {inspectingPeer.collabs || inspectingPeer.collabs_completed || 0} Collabs</span>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
+                {inspectingPeer.name?.slice(0, 2).toUpperCase()}
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
+                <p className="text-xs font-bold text-slate-500">{inspectingPeer.college || "Campus Member"}</p>
+                <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                  <span>{inspectingPeer.rating || 5.0} • {inspectingPeer.collabs || inspectingPeer.collabs_completed || 0} Collabs</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl text-xs font-semibold text-slate-700 italic">
+              "{inspectingPeer.bio || 'Up for campus food walks and discovering budget cafes!'}"
+            </div>
+
+            <div>
+              <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Shared Interests</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(inspectingPeer.interests || ["Food", "Cafes"]).map((tag) => (
+                  <span key={tag} className="text-[10px] font-bold px-2 py-1 bg-rose-50 border border-slate-900 text-rose-700 rounded-lg">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Peer Endorsements</span>
+              <div className="flex gap-1.5">
+                {["Punctual", "Cooperative", "5/5 Splitter"].map((badge) => (
+                  <span key={badge} className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-md">
+                    ✓ {badge}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setInspectingPeer(null)}
+              className="w-full py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[2px_2px_0px_#000]"
+            >
+              Close Profile
+            </button>
           </div>
         </div>
-      </div>
-
-      {/* Bio */}
-      <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl text-xs font-semibold text-slate-700 italic">
-        "{inspectingPeer.bio || 'Up for campus food walks and discovering budget cafes!'}"
-      </div>
-
-      {/* Interests / Tags */}
-      <div>
-        <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Shared Interests</span>
-        <div className="flex flex-wrap gap-1.5">
-          {(inspectingPeer.interests || ["Food", "Cafes"]).map((tag) => (
-            <span key={tag} className="text-[10px] font-bold px-2 py-1 bg-rose-50 border border-slate-900 text-rose-700 rounded-lg">
-              #{tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Behavioural Badges */}
-      <div>
-        <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Peer Endorsements</span>
-        <div className="flex gap-1.5">
-          {["Punctual", "Cooperative", "5/5 Splitter"].map((badge) => (
-            <span key={badge} className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-md">
-              ✓ {badge}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Dismiss / Action */}
-      <button
-        onClick={() => setInspectingPeer(null)}
-        className="w-full py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[2px_2px_0px_#000]"
-      >
-        Close Profile
-      </button>
-    </div>
-  </div>
-)}
-
-      </main>
+      )}
 
       {/* Edit Profile Modal */}
       {isEditingProfile && (
@@ -880,74 +861,77 @@ useEffect(() => {
           </div>
         </div>
       )}
-{showReviewModal && (
-  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4">
-      <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
-        <h3 className="text-sm font-black text-slate-900 uppercase">Rate Your Collab Peer</h3>
-        <button onClick={() => setShowReviewModal(false)}><X className="w-5 h-5 text-slate-500" /></button>
-      </div>
 
-      <form onSubmit={handleSubmitReview} className="space-y-3">
-        <div>
-          <label className="text-[11px] font-black text-slate-700 block mb-1">Score Outing Experience (1 to 5 Stars)</label>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4">
+            <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase">Rate Your Collab Peer</h3>
+              <button onClick={() => setShowReviewModal(false)}><X className="w-5 h-5 text-slate-500" /></button>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Score Outing Experience (1 to 5 Stars)</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setRatingScore(star)}
+                      className={`p-2 rounded-xl border-2 border-slate-900 transition ${
+                        ratingScore >= star ? 'bg-amber-300 shadow-[2px_2px_0px_#000]' : 'bg-slate-50'
+                      }`}
+                    >
+                      <Star className={`w-4 h-4 ${ratingScore >= star ? 'fill-amber-500 text-amber-600' : 'text-slate-400'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Peer Behaviour Indicators</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Punctual", "Friendly", "Cooperative", "Split Fairly", "Great Host"].map(tag => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => setSelectedReviewTags(prev => 
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                      )}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-900 ${
+                        selectedReviewTags.includes(tag) ? 'bg-[#FF6B6B] text-white' : 'bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Quick Experience Note</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Arrived on time, great cafe chat!" 
+                  value={reviewFeedback}
+                  onChange={(e) => setReviewFeedback(e.target.value)}
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                />
+              </div>
+
               <button
-                type="button"
-                key={star}
-                onClick={() => setRatingScore(star)}
-                className={`p-2 rounded-xl border-2 border-slate-900 transition ${
-                  ratingScore >= star ? 'bg-amber-300 shadow-[2px_2px_0px_#000]' : 'bg-slate-50'
-                }`}
+                type="submit"
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77]"
               >
-                <Star className={`w-4 h-4 ${ratingScore >= star ? 'fill-amber-500 text-amber-600' : 'text-slate-400'}`} />
+                Submit Review & Complete Collab
               </button>
-            ))}
+            </form>
           </div>
         </div>
+      )}
 
-        <div>
-          <label className="text-[11px] font-black text-slate-700 block mb-1">Peer Behaviour Indicators</label>
-          <div className="flex flex-wrap gap-1.5">
-            {["Punctual", "Friendly", "Cooperative", "Split Fairly", "Great Host"].map(tag => (
-              <button
-                type="button"
-                key={tag}
-                onClick={() => setSelectedReviewTags(prev => 
-                  prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-                )}
-                className={`text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-900 ${
-                  selectedReviewTags.includes(tag) ? 'bg-[#FF6B6B] text-white' : 'bg-slate-50 text-slate-700'
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[11px] font-black text-slate-700 block mb-0.5">Quick Experience Note</label>
-          <input 
-            type="text" 
-            placeholder="e.g. Arrived on time, great cafe chat!" 
-            value={reviewFeedback}
-            onChange={(e) => setReviewFeedback(e.target.value)}
-            className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-          />
-        </div>
-
-        <button
-          type="submit"
-          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77]"
-        >
-          Submit Review & Complete Collab
-        </button>
-      </form>
-    </div>
-  </div>
-)}
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 max-w-md w-full bg-white border-t-2 border-slate-900 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0px_-2px_0px_#000]">
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'home' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
