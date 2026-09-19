@@ -32,6 +32,7 @@ export default function App() {
       college: "MITS",
       branch: "CSE '28",
       bio: "Up for quick street food trails & weekend cafes.",
+      avatar_url: null,
       interests: ["Food", "Cafes"],
       preferred_outing_types: ["Budget Cafes", "Heritage Walk"],
       budget_preference: 300,
@@ -66,12 +67,57 @@ export default function App() {
   const [newMessageText, setNewMessageText] = useState("");
   const chatBottomRef = useRef(null);
 
-  // Reviews
+  // Reviews State
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [ratingScore, setRatingScore] = useState(5);
   const [selectedReviewTags, setSelectedReviewTags] = useState(["Punctual", "Friendly"]);
   const [reviewFeedback, setReviewFeedback] = useState("");
 
+  // Gallery File Upload & On-Device Auto Compression
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Please choose an image under 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_DIM = 240;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.82);
+        setProfileForm((prev) => ({ ...prev, avatar_url: compressedBase64 }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Submit Review
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!activeChatCollab) return;
@@ -159,7 +205,7 @@ export default function App() {
     }
   }, [userProfile?.id]);
 
-  // Optimized Polling: 8s interval + pause on tab blur
+  // Optimized chat polling (8s interval, pauses when tab is hidden)
   useEffect(() => {
     if (activeChatCollab && activeTab === 'chat') {
       fetchMessages(activeChatCollab.id);
@@ -181,53 +227,8 @@ export default function App() {
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
   };
-// Handles real file uploads from phone gallery / laptop
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
 
-    // Check size limit (max 5MB raw file)
-    if (file.size > 5 * 1024 * 1024) {
-      alert("Please choose an image under 5MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Create an off-screen canvas to resize & compress to lightweight web format
-        const canvas = document.createElement("canvas");
-        const MAX_DIM = 240;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_DIM) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Compress to JPEG at 80% quality (typically ~15KB to 30KB)
-        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.8);
-        setProfileForm((prev) => ({ ...prev, avatar_url: compressedBase64 }));
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-// Save Profile
+  // Save Profile to Neon DB
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -251,7 +252,7 @@ export default function App() {
         localStorage.setItem('meetra_user', JSON.stringify(updated));
         setIsEditingProfile(false);
         fetchCollabs(updated.id);
-        alert("Profile & Avatar updated successfully!");
+        alert("Profile & photo saved to database!");
       }
     } catch (err) {
       console.error("Profile save error:", err);
@@ -374,7 +375,7 @@ export default function App() {
     }
   };
 
-  // Send Chat Message with Optimistic Update (Instant Rendering)
+  // Send Chat Message with Optimistic Update
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessageText.trim() || !activeChatCollab) return;
@@ -635,11 +636,19 @@ export default function App() {
                           <div key={peer.id} className="flex items-center justify-between p-3 bg-amber-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
                             <div 
                               onClick={() => setInspectingPeer(peer)} 
-                              className="cursor-pointer hover:opacity-80 transition"
+                              className="cursor-pointer hover:opacity-80 transition flex items-center gap-2.5"
                             >
-                              <p className="text-xs font-black text-slate-900 underline decoration-slate-300">{peer.name}</p>
-                              <p className="text-[10px] text-slate-600 font-bold">{peer.college} • {peer.collabs} Collabs</p>
-                              <span className="text-[9px] text-emerald-700 font-bold">Tap to view profile ↗</span>
+                              <div className="w-9 h-9 rounded-xl border border-slate-900 bg-amber-200 overflow-hidden flex items-center justify-center shrink-0">
+                                {peer.avatar_url ? (
+                                  <img src={peer.avatar_url} alt={peer.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-[11px] font-black">{peer.name?.slice(0, 2).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-black text-slate-900 underline decoration-slate-300">{peer.name}</p>
+                                <p className="text-[10px] text-slate-600 font-bold">{peer.college} • {peer.collabs || 0} Collabs</p>
+                              </div>
                             </div>
                             <button 
                               onClick={() => handleSendInvite(peer)}
@@ -764,7 +773,7 @@ export default function App() {
           </div>
         )}
 
-{/* ==================== PROFILE TAB ==================== */}
+        {/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
@@ -883,7 +892,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Comprehensive Edit Profile Modal */}
+      {/* Edit Profile Modal (Gallery Upload Only, No URL or Presets) */}
       {isEditingProfile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 max-h-[90vh] overflow-y-auto">
@@ -895,44 +904,34 @@ export default function App() {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
-              {/* Profile Image Preview & URL Input */}
+              {/* Profile Photo Upload */}
               <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0">
+                <label className="text-[11px] font-black text-slate-700 block mb-1.5">Profile Photo</label>
+                <div className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
+                  {/* Photo Preview */}
+                  <div className="w-14 h-14 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
                     {profileForm.avatar_url ? (
                       <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-xs font-black">{profileForm.name?.slice(0, 2).toUpperCase()}</span>
+                      <span className="text-sm font-black text-slate-700">
+                        {profileForm.name?.slice(0, 2).toUpperCase()}
+                      </span>
                     )}
                   </div>
-                  <input 
-                    type="url" 
-                    placeholder="Paste image link..."
-                    value={profileForm.avatar_url || ""}
-                    onChange={(e) => setProfileForm({...profileForm, avatar_url: e.target.value})}
-                    className="flex-1 px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
-                  />
-                </div>
-                
-                {/* Avatar Presets */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-slate-500">Presets:</span>
-                  {[
-                    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
-                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
-                    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80",
-                    "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80"
-                  ].map((url, i) => (
-                    <button
-                      type="button"
-                      key={i}
-                      onClick={() => setProfileForm({...profileForm, avatar_url: url})}
-                      className="w-7 h-7 rounded-lg border border-slate-900 overflow-hidden hover:scale-105 transition"
-                    >
-                      <img src={url} alt={`preset-${i}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+
+                  {/* Native Upload Button */}
+                  <div className="flex-1 space-y-1">
+                    <label className="inline-flex items-center justify-center px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-y-0.5 transition">
+                      Upload from Gallery
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={handleFileUpload} 
+                        className="hidden" 
+                      />
+                    </label>
+                    <p className="text-[9px] font-bold text-slate-500">Auto-compressed for fast load</p>
+                  </div>
                 </div>
               </div>
 
