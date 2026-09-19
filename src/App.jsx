@@ -42,6 +42,7 @@ export default function App() {
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState(userProfile);
+  const [inspectingPeer, setInspectingPeer] = useState(null);
 
   // Generator form states
   const [hours, setHours] = useState(3);
@@ -159,13 +160,18 @@ export default function App() {
     }
   }, [userProfile?.id]);
 
-  useEffect(() => {
-    if (activeChatCollab && activeTab === 'chat') {
-      fetchMessages(activeChatCollab.id);
-      const interval = setInterval(() => fetchMessages(activeChatCollab.id), 4000);
-      return () => clearInterval(interval);
-    }
-  }, [activeChatCollab, activeTab]);
+  // AFTER: Relaxed interval + stops background fetching when tab is blurred
+useEffect(() => {
+  if (activeChatCollab && activeTab === 'chat') {
+    fetchMessages(activeChatCollab.id);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchMessages(activeChatCollab.id);
+      }
+    }, 8000);
+    return () => clearInterval(interval);
+  }
+}, [activeChatCollab, activeTab]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -325,29 +331,43 @@ export default function App() {
 
   // Send Chat Message
   const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessageText.trim() || !activeChatCollab) return;
+  e.preventDefault();
+  if (!newMessageText.trim() || !activeChatCollab) return;
 
-    try {
-      const res = await fetch(`${API_BASE}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          collab_id: activeChatCollab.id,
-          sender_id: userProfile.id,
-          sender_name: userProfile.name,
-          text: newMessageText.trim()
-        })
-      });
-
-      if (res.ok) {
-        setNewMessageText("");
-        fetchMessages(activeChatCollab.id);
-      }
-    } catch (err) {
-      console.error("Message send error:", err);
-    }
+  const optimisticMsg = {
+    id: Date.now(),
+    collab_id: activeChatCollab.id,
+    sender_id: userProfile.id,
+    sender_name: userProfile.name,
+    text: newMessageText.trim(),
+    created_at: new Date().toISOString()
   };
+
+  // 1. Instantly render on screen (Zero Latency)
+  setMessages(prev => [...prev, optimisticMsg]);
+  const textToSend = newMessageText.trim();
+  setNewMessageText("");
+
+  try {
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collab_id: activeChatCollab.id,
+        sender_id: userProfile.id,
+        sender_name: userProfile.name,
+        text: textToSend
+      })
+    });
+
+    if (!res.ok) {
+      // Revert if failed
+      fetchMessages(activeChatCollab.id);
+    }
+  } catch (err) {
+    console.error("Message send error:", err);
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-between max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
@@ -621,7 +641,9 @@ export default function App() {
 >
   Finish & Rate ✓
 </button>
-                
+                <p className="text-[10px] text-slate-600 font-bold">
+  Meeting Point: {location.includes("Gate") ? "Campus Tapri Point" : `Midway Junction near ${location}`} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)} / student
+</p>
 {/* Combined Itinerary Header */}
 <div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
   <div>
@@ -739,6 +761,84 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {inspectingPeer && (
+  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+      
+      {/* Modal Header */}
+      <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100">
+        <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-slate-900">
+          Campus Peer Verified
+        </span>
+        <button onClick={() => setInspectingPeer(null)}>
+          <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+        </button>
+      </div>
+
+      // On the Peer List card:
+<div 
+  onClick={() => setInspectingPeer(peer)} 
+  className="cursor-pointer hover:opacity-80"
+>
+  <p className="text-xs font-black text-slate-900 underline decoration-slate-300">{peer.name}</p>
+  ...
+</div>
+
+      {/* Identity Card */}
+      <div className="flex items-center gap-3">
+        <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
+          {inspectingPeer.name?.slice(0, 2).toUpperCase()}
+        </div>
+        <div>
+          <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
+          <p className="text-xs font-bold text-slate-500">{inspectingPeer.college || "Campus Member"}</p>
+          <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+            <span>{inspectingPeer.rating || 5.0} • {inspectingPeer.collabs || inspectingPeer.collabs_completed || 0} Collabs</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Bio */}
+      <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl text-xs font-semibold text-slate-700 italic">
+        "{inspectingPeer.bio || 'Up for campus food walks and discovering budget cafes!'}"
+      </div>
+
+      {/* Interests / Tags */}
+      <div>
+        <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Shared Interests</span>
+        <div className="flex flex-wrap gap-1.5">
+          {(inspectingPeer.interests || ["Food", "Cafes"]).map((tag) => (
+            <span key={tag} className="text-[10px] font-bold px-2 py-1 bg-rose-50 border border-slate-900 text-rose-700 rounded-lg">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Behavioural Badges */}
+      <div>
+        <span className="text-[11px] font-black text-slate-800 uppercase block mb-1.5">Peer Endorsements</span>
+        <div className="flex gap-1.5">
+          {["Punctual", "Cooperative", "5/5 Splitter"].map((badge) => (
+            <span key={badge} className="text-[9px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-md">
+              ✓ {badge}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Dismiss / Action */}
+      <button
+        onClick={() => setInspectingPeer(null)}
+        className="w-full py-2.5 bg-slate-900 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[2px_2px_0px_#000]"
+      >
+        Close Profile
+      </button>
+    </div>
+  </div>
+)}
 
       </main>
 
