@@ -182,7 +182,7 @@ export default function App() {
     );
   };
 
-  // Save Profile
+// Save Profile
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -194,9 +194,10 @@ export default function App() {
           college: profileForm.college,
           branch: profileForm.branch,
           bio: profileForm.bio,
-          interests: profileForm.interests,
-          preferred_outing_types: profileForm.preferred_outing_types,
-          budget_preference: Number(profileForm.budget_preference)
+          avatar_url: profileForm.avatar_url,
+          interests: profileForm.interests || ["Food", "Cafes"],
+          preferred_outing_types: profileForm.preferred_outing_types || ["Budget Cafes"],
+          budget_preference: Number(profileForm.budget_preference || 300)
         })
       });
       if (res.ok) {
@@ -205,7 +206,7 @@ export default function App() {
         localStorage.setItem('meetra_user', JSON.stringify(updated));
         setIsEditingProfile(false);
         fetchCollabs(updated.id);
-        alert("Profile saved to database!");
+        alert("Profile & Avatar updated successfully!");
       }
     } catch (err) {
       console.error("Profile save error:", err);
@@ -718,17 +719,27 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== PROFILE TAB ==================== */}
+{/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
-                  {userProfile.name.slice(0, 2).toUpperCase()}
+                {/* Photo Avatar with Initials Fallback */}
+                <div className="w-16 h-16 rounded-2xl border-2 border-slate-900 bg-amber-200 overflow-hidden flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000] shrink-0">
+                  {userProfile.avatar_url ? (
+                    <img 
+                      src={userProfile.avatar_url} 
+                      alt={userProfile.name} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span>{userProfile.name?.slice(0, 2).toUpperCase()}</span>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900">{userProfile.name}</h3>
-                  <p className="text-xs font-bold text-slate-500">{userProfile.college} • {userProfile.branch}</p>
+                  <p className="text-xs font-bold text-slate-500">{userProfile.college} • {userProfile.branch || "Student"}</p>
                   <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
                     <span>{userProfile.rating} Compatibility Rating</span>
@@ -737,13 +748,13 @@ export default function App() {
               </div>
               <button 
                 onClick={() => { setProfileForm(userProfile); setIsEditingProfile(true); }}
-                className="p-2 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl shadow-[2px_2px_0px_#000]"
+                className="p-2 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl shadow-[2px_2px_0px_#000] transition active:translate-y-0.5"
               >
                 <Edit3 className="w-4 h-4 text-slate-800" />
               </button>
             </div>
 
-            <p className="text-xs font-semibold text-slate-700 italic">"{userProfile.bio}"</p>
+            <p className="text-xs font-semibold text-slate-700 italic">"{userProfile.bio || 'Up for campus outings and coffee!'}"</p>
 
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-3 bg-slate-50 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0px_#000]">
@@ -774,8 +785,12 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000]">
-                {inspectingPeer.name?.slice(0, 2).toUpperCase()}
+              <div className="w-14 h-14 rounded-2xl border-2 border-slate-900 bg-amber-200 overflow-hidden flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000] shrink-0">
+                {inspectingPeer.avatar_url ? (
+                  <img src={inspectingPeer.avatar_url} alt={inspectingPeer.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{inspectingPeer.name?.slice(0, 2).toUpperCase()}</span>
+                )}
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
@@ -823,37 +838,108 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit Profile Modal */}
+      {/* Comprehensive Edit Profile Modal */}
       {isEditingProfile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4">
+          <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase">Edit Your Profile</h3>
-              <button onClick={() => setIsEditingProfile(false)}><X className="w-5 h-5 text-slate-500" /></button>
+              <h3 className="text-sm font-black text-slate-900 uppercase">Edit Profile & Photo</h3>
+              <button onClick={() => setIsEditingProfile(false)}>
+                <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
+              {/* Profile Image Preview & URL Input */}
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-12 h-12 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0">
+                    {profileForm.avatar_url ? (
+                      <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-black">{profileForm.name?.slice(0, 2).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <input 
+                    type="url" 
+                    placeholder="Paste image link..."
+                    value={profileForm.avatar_url || ""}
+                    onChange={(e) => setProfileForm({...profileForm, avatar_url: e.target.value})}
+                    className="flex-1 px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
+                  />
+                </div>
+                
+                {/* Avatar Presets */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500">Presets:</span>
+                  {[
+                    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80",
+                    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+                    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80",
+                    "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80"
+                  ].map((url, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      onClick={() => setProfileForm({...profileForm, avatar_url: url})}
+                      className="w-7 h-7 rounded-lg border border-slate-900 overflow-hidden hover:scale-105 transition"
+                    >
+                      <img src={url} alt={`preset-${i}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Full Name */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
                 <input 
-                  type="text" required value={profileForm.name}
+                  type="text" required 
+                  value={profileForm.name}
                   onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
                 />
               </div>
 
+              {/* College */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">College</label>
                 <input 
-                  type="text" required value={profileForm.college}
+                  type="text" required 
+                  value={profileForm.college}
                   onChange={(e) => setProfileForm({...profileForm, college: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
+                />
+              </div>
+
+              {/* Branch & Year */}
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch & Batch</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. CSE '28, ECE '27"
+                  value={profileForm.branch || ""}
+                  onChange={(e) => setProfileForm({...profileForm, branch: e.target.value})}
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
+                />
+              </div>
+
+              {/* Bio */}
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
+                <textarea 
+                  rows={2}
+                  placeholder="Tell peers what kind of outings you like..."
+                  value={profileForm.bio || ""}
+                  onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none resize-none"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77]"
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77] active:translate-y-0.5 transition"
               >
                 Save Profile to Neon DB
               </button>
