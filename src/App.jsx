@@ -65,6 +65,47 @@ export default function App() {
   const [newMessageText, setNewMessageText] = useState("");
   const chatBottomRef = useRef(null);
 
+  //Reviews
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [selectedReviewTags, setSelectedReviewTags] = useState(["Punctual", "Friendly"]);
+  const [reviewFeedback, setReviewFeedback] = useState("");
+
+  const handleSubmitReview = async (e) => {
+  e.preventDefault();
+  if (!activeChatCollab) return;
+
+  const peerId = activeChatCollab.sender_id === userProfile.id 
+    ? activeChatCollab.receiver_id 
+    : activeChatCollab.sender_id;
+
+  try {
+    const res = await fetch(`${API_BASE}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collab_id: activeChatCollab.id,
+        reviewer_id: userProfile.id,
+        reviewer_name: userProfile.name,
+        reviewee_id: peerId,
+        rating: Number(ratingScore),
+        tags: selectedReviewTags,
+        feedback: reviewFeedback
+      })
+    });
+
+    if (res.ok) {
+      alert("Outing marked complete! Peer rating updated.");
+      setShowReviewModal(false);
+      setActiveChatCollab(null);
+      fetchCollabs(userProfile.id);
+      setActiveTab('home');
+    }
+  } catch (err) {
+    console.error("Review submission error:", err);
+  }
+};
+
   // Fetch Outings
   const fetchOutings = async () => {
     try {
@@ -574,22 +615,36 @@ export default function App() {
           <div className="space-y-4">
             {activeChatCollab ? (
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
+                <button
+  onClick={() => setShowReviewModal(true)}
+  className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition"
+>
+  Finish & Rate ✓
+</button>
                 
-                {/* Combined Itinerary Header */}
-                <div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
-                      Combined Itinerary
-                    </span>
-                    <h4 className="text-xs font-black text-slate-900 mt-1">
-                      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
-                    </h4>
-                    <p className="text-[10px] text-slate-600 font-bold">Split: ₹150 / student • Meeting: Tapri Point</p>
-                  </div>
-                  <span className="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-1 rounded-lg border border-slate-900">
-                    Active Collab
-                  </span>
-                </div>
+{/* Combined Itinerary Header */}
+<div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
+  <div>
+    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
+      Combined Itinerary
+    </span>
+    <h4 className="text-xs font-black text-slate-900 mt-1">
+      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
+    </h4>
+    <p className="text-[10px] text-slate-600 font-bold">Split: ₹150 / student • Meeting: Tapri Point</p>
+  </div>
+  <div className="flex flex-col items-end gap-1.5">
+    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-slate-900">
+      Active Collab
+    </span>
+    <button
+      onClick={() => setShowReviewModal(true)}
+      className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
+    >
+      Finish & Rate ✓
+    </button>
+  </div>
+</div>
 
                 {/* Message Log */}
                 <div className="flex-1 p-3 overflow-y-auto space-y-2 bg-[#FDFBF7]">
@@ -725,7 +780,74 @@ export default function App() {
           </div>
         </div>
       )}
+{showReviewModal && (
+  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4">
+      <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
+        <h3 className="text-sm font-black text-slate-900 uppercase">Rate Your Collab Peer</h3>
+        <button onClick={() => setShowReviewModal(false)}><X className="w-5 h-5 text-slate-500" /></button>
+      </div>
 
+      <form onSubmit={handleSubmitReview} className="space-y-3">
+        <div>
+          <label className="text-[11px] font-black text-slate-700 block mb-1">Score Outing Experience (1 to 5 Stars)</label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                type="button"
+                key={star}
+                onClick={() => setRatingScore(star)}
+                className={`p-2 rounded-xl border-2 border-slate-900 transition ${
+                  ratingScore >= star ? 'bg-amber-300 shadow-[2px_2px_0px_#000]' : 'bg-slate-50'
+                }`}
+              >
+                <Star className={`w-4 h-4 ${ratingScore >= star ? 'fill-amber-500 text-amber-600' : 'text-slate-400'}`} />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-black text-slate-700 block mb-1">Peer Behaviour Indicators</label>
+          <div className="flex flex-wrap gap-1.5">
+            {["Punctual", "Friendly", "Cooperative", "Split Fairly", "Great Host"].map(tag => (
+              <button
+                type="button"
+                key={tag}
+                onClick={() => setSelectedReviewTags(prev => 
+                  prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                )}
+                className={`text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-900 ${
+                  selectedReviewTags.includes(tag) ? 'bg-[#FF6B6B] text-white' : 'bg-slate-50 text-slate-700'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] font-black text-slate-700 block mb-0.5">Quick Experience Note</label>
+          <input 
+            type="text" 
+            placeholder="e.g. Arrived on time, great cafe chat!" 
+            value={reviewFeedback}
+            onChange={(e) => setReviewFeedback(e.target.value)}
+            className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77]"
+        >
+          Submit Review & Complete Collab
+        </button>
+      </form>
+    </div>
+  </div>
+)}
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 max-w-md w-full bg-white border-t-2 border-slate-900 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0px_-2px_0px_#000]">
         <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-0.5 text-[11px] font-black ${activeTab === 'home' ? 'text-[#FF6B6B]' : 'text-slate-500'}`}>
