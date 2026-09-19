@@ -181,7 +181,52 @@ export default function App() {
       prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
     );
   };
+// Handles real file uploads from phone gallery / laptop
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    // Check size limit (max 5MB raw file)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Please choose an image under 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create an off-screen canvas to resize & compress to lightweight web format
+        const canvas = document.createElement("canvas");
+        const MAX_DIM = 240;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compress to JPEG at 80% quality (typically ~15KB to 30KB)
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.8);
+        setProfileForm((prev) => ({ ...prev, avatar_url: compressedBase64 }));
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
 // Save Profile
   const handleSaveProfile = async (e) => {
     e.preventDefault();
