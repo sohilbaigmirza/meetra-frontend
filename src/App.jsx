@@ -281,29 +281,30 @@ export default function App() {
 
   // Generate Plan
   const handleGeneratePlan = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/itinerary/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          available_hours: Number(hours),
-          budget: Number(budget),
-          location,
-          interests: selectedInterests,
-          outing_type: outingType,
-          is_solo: mode === 'solo'
-        })
-      });
-      const data = await res.json();
-      setPlan(data);
-      setActiveTab('outing');
-    } catch (err) {
-      console.error("Generator error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const res = await fetch(`${API_BASE}/itinerary/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userProfile.id,
+        available_hours: Number(hours),
+        budget: Number(budget),
+        location,
+        interests: selectedInterests,
+        outing_type: outingType,
+        is_solo: mode === 'solo'
+      })
+    });
+    const data = await res.json();
+    setPlan(data);
+    setActiveTab('outing');
+  } catch (err) {
+    console.error("Generator error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Lock & Save Outing
   const handleConfirmAndSave = async () => {
