@@ -7,6 +7,7 @@ import {
   Sparkles, 
   Users, 
   ArrowRight, 
+  ArrowLeft,
   Star, 
   ShieldCheck, 
   CheckCircle2, 
@@ -192,27 +193,10 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCollabRequests(data);
-        const accepted = data.find(c => c.status === 'accepted');
-        if (accepted) {
-          setActiveChatCollab(accepted);
-        }
+        // REMOVED: Auto-locking to data[0] so the inbox roster can be viewed
       }
     } catch (err) {
       console.error("Collabs fetch error:", err);
-    }
-  };
-
-  // Fetch Chat Messages
-  const fetchMessages = async (collabId) => {
-    if (!collabId) return;
-    try {
-      const res = await fetch(`${API_BASE}/chat/${collabId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data);
-      }
-    } catch (err) {
-      console.error("Chat fetch error:", err);
     }
   };
 
@@ -744,29 +728,35 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== CHAT TAB ==================== */}
+{/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div className="space-y-4">
             {activeChatCollab ? (
+              /* Active Chat Conversation Room */
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
                 
-                {/* Combined Itinerary Header */}
-                <div className="p-3.5 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider bg-white px-2 py-0.5 rounded border border-slate-900">
-                      Combined Itinerary
-                    </span>
-                    <h4 className="text-xs font-black text-slate-900 mt-1">
-                      With {activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_name : activeChatCollab.sender_name}
-                    </h4>
-                    <p className="text-[10px] text-slate-600 font-bold">
-                      Meeting Point: {location.includes("Gate") ? "Campus Tapri Point" : `Midway Junction near ${location}`} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)} / student
-                    </p>
+                {/* Header with Back Button */}
+                <div className="p-3 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <button 
+                      onClick={() => setActiveChatCollab(null)}
+                      className="p-1.5 bg-white hover:bg-slate-100 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
+                    >
+                      <ArrowLeft className="w-4 h-4 text-slate-900" />
+                    </button>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900">
+                        {activeChatCollab.sender_id === userProfile.id 
+                          ? activeChatCollab.receiver_name 
+                          : activeChatCollab.sender_name}
+                      </h4>
+                      <p className="text-[9px] text-slate-600 font-bold">
+                        Meeting: {location.includes("Gate") ? "Campus Tapri Point" : "Midway Spot"} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-slate-900">
-                      Active Collab
-                    </span>
+
+                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setShowReviewModal(true)}
                       className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
@@ -780,7 +770,7 @@ export default function App() {
                 <div className="flex-1 p-3 overflow-y-auto space-y-2 bg-[#FDFBF7]">
                   {messages.length === 0 ? (
                     <div className="text-center py-10 text-slate-400 text-xs font-bold">
-                      Coordination chat open! Say hello and pick your meeting time.
+                      Coordination chat open! Say hello and decide meetup time.
                     </div>
                   ) : (
                     messages.map((m) => {
@@ -819,12 +809,57 @@ export default function App() {
 
               </div>
             ) : (
-              <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] text-center py-16 space-y-3">
-                <MessageSquare className="w-12 h-12 text-slate-300 mx-auto" />
-                <h3 className="text-base font-black text-slate-900">No Active Chat Yet</h3>
-                <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium">
-                  Coordination chat unlocks as soon as an invitation is accepted on the Home tab.
-                </p>
+              /* Conversations Roster / Inbox View */
+              <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
+                <div className="flex justify-between items-center border-b-2 border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-wide text-slate-900 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4 text-[#4D96FF]" /> Active Conversations
+                    </h3>
+                    <p className="text-[11px] font-bold text-slate-500">Pick a peer to coordinate your outing</p>
+                  </div>
+                  <span className="text-xs font-black bg-blue-100 border border-slate-900 px-2 py-0.5 rounded-md">
+                    {collabRequests.filter(c => c.status === 'accepted').length} Active
+                  </span>
+                </div>
+
+                {collabRequests.filter(c => c.status === 'accepted').length === 0 ? (
+                  <div className="text-center py-12 space-y-3">
+                    <MessageSquare className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold text-slate-500">No accepted chats yet.</p>
+                    <p className="text-[11px] text-slate-400">Accept an invite on the Home tab or send an outing request to start chatting!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {collabRequests
+                      .filter(c => c.status === 'accepted')
+                      .map((collab) => {
+                        const peerName = collab.sender_id === userProfile.id 
+                          ? collab.receiver_name 
+                          : collab.sender_name;
+                        return (
+                          <div 
+                            key={collab.id}
+                            onClick={() => setActiveChatCollab(collab)}
+                            className="p-3 bg-slate-50 hover:bg-amber-50 border-2 border-slate-900 rounded-xl flex items-center justify-between shadow-[2px_2px_0px_#000] cursor-pointer transition"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl border border-slate-900 bg-amber-200 flex items-center justify-center font-black text-xs">
+                                {peerName.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-black text-slate-900">{peerName}</h4>
+                                <p className="text-[10px] font-bold text-slate-500">Collab #{collab.id} • Match: {collab.match_percentage}%</p>
+                              </div>
+                            </div>
+                            <span className="text-xs font-black bg-emerald-400 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000]">
+                              Open Chat →
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             )}
           </div>
