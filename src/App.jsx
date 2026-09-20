@@ -44,6 +44,7 @@ export default function App() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState(userProfile);
   const [inspectingPeer, setInspectingPeer] = useState(null);
+  const [friendsList, setFriendsList] = useState([]);
 
   // Generator form states
   const [hours, setHours] = useState(3);
@@ -152,6 +153,14 @@ export default function App() {
       console.error("Review submission error:", err);
     }
   };
+
+  useEffect(() => {
+    fetchOutings();
+    if (userProfile?.id) {
+      fetchCollabs(userProfile.id);
+      fetchFriends(userProfile.id);
+    }
+  }, [userProfile?.id]);
 
   // Fetch Outings
   const fetchOutings = async () => {
@@ -820,6 +829,70 @@ export default function App() {
                 <p className="text-[10px] font-bold text-slate-500 uppercase">Collabs Completed</p>
               </div>
             </div>
+            {/* Campus Friends & Incoming Requests */}
+            <div className="pt-2 border-t-2 border-slate-100 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-[#4D96FF]" /> Campus Friends (
+                  {friendsList.filter(f => f.status === 'accepted').length})
+                </span>
+              </div>
+
+              {/* Pending Friend Requests */}
+              {friendsList.filter(f => f.status === 'pending' && f.receiver_id === userProfile.id).length > 0 && (
+                <div className="p-3 bg-blue-50 border-2 border-slate-900 rounded-xl space-y-2">
+                  <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">Friend Invites</span>
+                  {friendsList
+                    .filter(f => f.status === 'pending' && f.receiver_id === userProfile.id)
+                    .map(req => (
+                      <div key={req.id} className="flex justify-between items-center bg-white p-2 border border-slate-900 rounded-lg">
+                        <span className="text-xs font-black">{req.requester_name}</span>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleRespondFriend(req.id, 'accepted')}
+                            className="px-2 py-1 text-[10px] font-black bg-emerald-500 text-white rounded border border-slate-900"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            onClick={() => handleRespondFriend(req.id, 'rejected')}
+                            className="px-2 py-1 text-[10px] font-black bg-slate-200 text-slate-700 rounded border border-slate-900"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* Accepted Friends Roster */}
+              <div className="space-y-1.5">
+                {friendsList.filter(f => f.status === 'accepted').length === 0 ? (
+                  <p className="text-[11px] font-medium text-slate-400 italic">No campus friends added yet. Inspect peers on the Outings tab to connect!</p>
+                ) : (
+                  friendsList
+                    .filter(f => f.status === 'accepted')
+                    .map(item => {
+                      const friendName = item.requester_id === userProfile.id ? item.receiver_name : item.requester_name;
+                      return (
+                        <div key={item.id} className="p-2.5 bg-slate-50 border-2 border-slate-900 rounded-xl flex items-center justify-between shadow-[2px_2px_0px_#000]">
+                          <span className="text-xs font-black text-slate-900">{friendName}</span>
+                          <button
+                            onClick={() => {
+                              setActiveTab('home');
+                              alert(`Ready! Choose hours and budget to plan an outing with ${friendName}`);
+                            }}
+                            className="text-[10px] font-black bg-amber-200 hover:bg-amber-300 px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000]"
+                          >
+                            Plan Outing ↗
+                          </button>
+                        </div>
+                      );
+                    })
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -881,6 +954,16 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* Add Friend Trigger */}
+            {inspectingPeer.id !== userProfile.id && (
+              <button
+                onClick={() => handleSendFriendRequest(inspectingPeer)}
+                className="w-full py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition"
+              >
+                + Connect as Campus Friend
+              </button>
+            )}
 
             <button
               onClick={() => setInspectingPeer(null)}
@@ -1085,3 +1168,56 @@ export default function App() {
     </div>
   );
 }
+
+// Fetch Friends
+  const fetchFriends = async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFriendsList(data);
+      }
+    } catch (err) {
+      console.error("Friends fetch error:", err);
+    }
+  };
+
+  // Send Friend Request
+  const handleSendFriendRequest = async (peer) => {
+    if (!userProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_id: userProfile.id,
+          requester_name: userProfile.name,
+          receiver_id: peer.id,
+          receiver_name: peer.name
+        })
+      });
+      if (res.ok) {
+        alert(`Friend request sent to ${peer.name}!`);
+        fetchFriends(userProfile.id);
+      }
+    } catch (err) {
+      console.error("Friend request error:", err);
+    }
+  };
+
+  // Accept/Reject Friend Request
+  const handleRespondFriend = async (friendshipId, status) => {
+    try {
+      const res = await fetch(`${API_BASE}/friends/${friendshipId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        fetchFriends(userProfile.id);
+      }
+    } catch (err) {
+      console.error("Friend response error:", err);
+    }
+  };
