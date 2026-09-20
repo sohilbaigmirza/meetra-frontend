@@ -16,7 +16,10 @@ import {
   Check, 
   Edit3, 
   X, 
-  Send 
+  Send,
+  LogOut,
+  Phone,
+  KeyRound
 } from 'lucide-react';
 
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
@@ -24,34 +27,39 @@ const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   
-  // User Profile State
+  // User Profile State (Starts as null so new users see the login page)
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('meetra_user');
-    return saved ? JSON.parse(saved) : {
-      id: 1,
-      name: "Sumit",
-      college: "MITS",
-      branch: "CSE '28",
-      bio: "Up for quick street food trails & weekend cafes.",
-      avatar_url: null,
-      interests: ["Food", "Cafes"],
-      preferred_outing_types: ["Budget Cafes", "Heritage Walk"],
-      budget_preference: 300,
-      rating: 5.0,
-      collabs_completed: 0
-    };
+    return saved ? JSON.parse(saved) : null;
   });
 
+  // Auth Flow States
+  const [authStep, setAuthStep] = useState('phone'); // 'phone', 'otp', 'new_profile'
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // Profile Edit / Setup Form
   const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState(userProfile);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    college: 'ITM University',
+    branch: "CSE '28",
+    bio: 'Up for budget cafe hangouts & street food trails!',
+    avatar_url: null,
+    interests: ['Food', 'Cafes'],
+    preferred_outing_types: ['Budget Cafes', 'Heritage Walk'],
+    budget_preference: 300
+  });
+
   const [inspectingPeer, setInspectingPeer] = useState(null);
   const [friendsList, setFriendsList] = useState([]);
 
   // Generator form states
   const [hours, setHours] = useState(3);
-  const [budget, setBudget] = useState(userProfile.budget_preference || 300);
-  const [location, setLocation] = useState('College Main Gate');
-  const [selectedInterests, setSelectedInterests] = useState(userProfile.interests || ['Food', 'Cafes']);
+  const [budget, setBudget] = useState(300);
+  const [location, setLocation] = useState('Campus Main Gate');
+  const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
   const [mode, setMode] = useState('match');
   
@@ -119,7 +127,102 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Fetch Friends List
+  // ---------------- AUTHENTICATION HANDLERS ---------------- //
+  const handleSendOtp = (e) => {
+    e.preventDefault();
+    if (phoneNumber.trim().length < 10) {
+      alert("Please enter a valid 10-digit mobile number.");
+      return;
+    }
+    setAuthStep('otp');
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (otpCode !== '0000') {
+      alert("Invalid OTP. Use test PIN: 0000");
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/auth/phone-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber.trim() })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.is_new_user && data.user) {
+          // Existing User Login
+          setUserProfile(data.user);
+          localStorage.setItem('meetra_user', JSON.stringify(data.user));
+          setAuthStep('phone');
+        } else {
+          // New User -> Prompt Profile Creation
+          setAuthStep('new_profile');
+        }
+      }
+    } catch (err) {
+      console.error("Auth error:", err);
+      // Offline fallback: prompt profile setup
+      setAuthStep('new_profile');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleCompleteRegistration = async (e) => {
+    e.preventDefault();
+    if (!profileForm.name.trim()) {
+      alert("Please enter your name.");
+      return;
+    }
+
+    setAuthLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/users/profile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone_or_email: phoneNumber.trim(),
+          name: profileForm.name.trim(),
+          college: profileForm.college.trim(),
+          branch: profileForm.branch.trim(),
+          bio: profileForm.bio.trim(),
+          avatar_url: profileForm.avatar_url,
+          interests: profileForm.interests || ["Food", "Cafes"],
+          preferred_outing_types: profileForm.preferred_outing_types || ["Budget Cafes"],
+          budget_preference: Number(profileForm.budget_preference || 300)
+        })
+      });
+
+      if (res.ok) {
+        const newUser = await res.json();
+        setUserProfile(newUser);
+        localStorage.setItem('meetra_user', JSON.stringify(newUser));
+        setAuthStep('phone');
+      }
+    } catch (err) {
+      console.error("Registration error:", err);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem('meetra_user');
+      setUserProfile(null);
+      setAuthStep('phone');
+      setPhoneNumber('');
+      setOtpCode('');
+      setActiveTab('home');
+    }
+  };
+
+  // ---------------- DATA FETCHING ---------------- //
   const fetchFriends = async (userId) => {
     if (!userId) return;
     try {
@@ -133,7 +236,6 @@ export default function App() {
     }
   };
 
-  // Send Friend Request
   const handleSendFriendRequest = async (peer) => {
     if (!userProfile?.id) return;
     try {
@@ -156,7 +258,6 @@ export default function App() {
     }
   };
 
-  // Accept/Reject Friend Request
   const handleRespondFriend = async (friendshipId, status) => {
     try {
       const res = await fetch(`${API_BASE}/friends/${friendshipId}`, {
@@ -172,7 +273,6 @@ export default function App() {
     }
   };
 
-  // Fetch Outings
   const fetchOutings = async () => {
     try {
       const res = await fetch(`${API_BASE}/outings`);
@@ -185,7 +285,6 @@ export default function App() {
     }
   };
 
-  // Fetch Collab Requests
   const fetchCollabs = async (userId) => {
     if (!userId) return;
     try {
@@ -199,7 +298,6 @@ export default function App() {
     }
   };
 
-  // Fetch Chat Messages
   const fetchMessages = async (collabId) => {
     if (!collabId) return;
     try {
@@ -213,7 +311,6 @@ export default function App() {
     }
   };
 
-  // Initial Sync
   useEffect(() => {
     fetchOutings();
     if (userProfile?.id) {
@@ -222,7 +319,6 @@ export default function App() {
     }
   }, [userProfile?.id]);
 
-  // Optimized chat polling (8s interval, pauses when tab is blurred)
   useEffect(() => {
     if (activeChatCollab && activeTab === 'chat') {
       fetchMessages(activeChatCollab.id);
@@ -245,7 +341,6 @@ export default function App() {
     );
   };
 
-  // Save Profile to Neon DB
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     try {
@@ -253,7 +348,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: userProfile.id, // <--- PASS CURRENT USER ID HERE
+          id: userProfile.id,
           name: profileForm.name,
           college: profileForm.college,
           branch: profileForm.branch,
@@ -278,7 +373,6 @@ export default function App() {
     }
   };
 
-  // Generate Plan
   const handleGeneratePlan = async () => {
     setLoading(true);
     try {
@@ -286,7 +380,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: userProfile.id,
+          user_id: userProfile?.id,
           available_hours: Number(hours),
           budget: Number(budget),
           location,
@@ -305,9 +399,8 @@ export default function App() {
     }
   };
 
-  // Lock & Save Outing
   const handleConfirmAndSave = async () => {
-    if (!plan) return;
+    if (!plan || !userProfile) return;
     setSaving(true);
     try {
       const payload = {
@@ -343,12 +436,8 @@ export default function App() {
     }
   };
 
-  // Send Collab Invite
   const handleSendInvite = async (peer) => {
-    if (!userProfile?.id) {
-      alert("Please save your profile first!");
-      return;
-    }
+    if (!userProfile?.id) return;
     const activeOutingId = plan?.id || (savedOutings.length > 0 ? savedOutings[0].id : 1);
     try {
       const res = await fetch(`${API_BASE}/collabs`, {
@@ -374,7 +463,6 @@ export default function App() {
     }
   };
 
-  // Accept/Decline Collab
   const handleRespondCollab = async (collabId, status) => {
     try {
       const res = await fetch(`${API_BASE}/collabs/${collabId}`, {
@@ -395,10 +483,9 @@ export default function App() {
     }
   };
 
-  // Send Chat Message with Optimistic UI
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessageText.trim() || !activeChatCollab) return;
+    if (!newMessageText.trim() || !activeChatCollab || !userProfile) return;
 
     const optimisticMsg = {
       id: Date.now(),
@@ -433,10 +520,9 @@ export default function App() {
     }
   };
 
-  // Submit Outing Review
   const handleSubmitReview = async (e) => {
     e.preventDefault();
-    if (!activeChatCollab) return;
+    if (!activeChatCollab || !userProfile) return;
 
     const peerId = activeChatCollab.sender_id === userProfile.id 
       ? activeChatCollab.receiver_id 
@@ -469,6 +555,187 @@ export default function App() {
     }
   };
 
+  // ---------------- RENDER LANDING & LOGIN IF NOT LOGGED IN ---------------- //
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-center px-6 max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
+        <div className="space-y-6">
+          
+          {/* Brand Header */}
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center gap-2 bg-white border-2 border-slate-900 px-3 py-1 rounded-full shadow-[2px_2px_0px_#000]">
+              <Sparkles className="w-4 h-4 text-[#FF6B6B]" />
+              <span className="text-xs font-black tracking-wider uppercase">Campus Outings</span>
+            </div>
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">MeetRa</h1>
+            <p className="text-xs font-bold text-slate-600">Zero awkward plans. Spontaneous college outings.</p>
+          </div>
+
+          {/* STEP 1: Phone Number Input */}
+          {authStep === 'phone' && (
+            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4">
+              <div>
+                <span className="text-xs font-black uppercase text-slate-800">Student Sign In</span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">Enter your mobile number</h3>
+                <p className="text-[11px] text-slate-500 font-semibold mt-1">We'll send an OTP to verify your campus identity.</p>
+              </div>
+
+              <form onSubmit={handleSendOtp} className="space-y-3">
+                <div className="flex items-center gap-2 border-2 border-slate-900 rounded-xl px-3 py-2 bg-slate-50 focus-within:bg-white transition">
+                  <span className="text-xs font-black text-slate-500">+91</span>
+                  <input 
+                    type="tel" 
+                    maxLength={10}
+                    placeholder="Enter 10-digit number"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                    className="w-full text-xs font-bold bg-transparent focus:outline-none text-slate-900"
+                    required
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  className="w-full py-3 bg-[#FF6B6B] hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-2"
+                >
+                  Continue
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* STEP 2: OTP Verification (Test Pin 0000) */}
+          {authStep === 'otp' && (
+            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-xs font-black uppercase text-slate-800">Verification</span>
+                  <h3 className="text-lg font-black text-slate-900 mt-0.5">Enter 4-Digit OTP</h3>
+                  <p className="text-[11px] text-slate-500 font-semibold mt-1">Sent to +91 {phoneNumber}</p>
+                </div>
+                <button 
+                  onClick={() => setAuthStep('phone')} 
+                  className="text-[10px] font-black underline text-slate-500 hover:text-slate-800"
+                >
+                  Edit Number
+                </button>
+              </div>
+
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <input 
+                  type="text" 
+                  maxLength={4}
+                  placeholder="• • • •"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  className="w-full text-center text-2xl tracking-[0.5em] font-black border-2 border-slate-900 rounded-xl py-2 bg-slate-50 focus:bg-white focus:outline-none"
+                  autoFocus
+                  required
+                />
+
+                <div className="p-2.5 bg-amber-50 border border-slate-900 rounded-xl text-[10px] font-bold text-amber-900 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                  <span>Test mode active: Enter OTP <b>0000</b></span>
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-2"
+                >
+                  {authLoading ? "Verifying..." : "Verify & Continue"}
+                  <Check className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* STEP 3: New User College Profile Setup */}
+          {authStep === 'new_profile' && (
+            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4 max-h-[85vh] overflow-y-auto">
+              <div>
+                <span className="text-xs font-black uppercase text-slate-800">Welcome to MeetRa!</span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">Create Your Student Card</h3>
+                <p className="text-[11px] text-slate-500 font-semibold mt-1">Peers will see this when matching for outings.</p>
+              </div>
+
+              <form onSubmit={handleCompleteRegistration} className="space-y-3">
+                {/* Photo Upload */}
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
+                    <div className="w-12 h-12 rounded-xl border border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0">
+                      {profileForm.avatar_url ? (
+                        <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-black text-slate-700">DP</span>
+                      )}
+                    </div>
+                    <label className="px-3 py-1.5 bg-white text-slate-900 border-2 border-slate-900 rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-slate-100 transition">
+                      Upload from Gallery
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
+                  <input 
+                    type="text" required placeholder="e.g. Sohil Mirza"
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">College</label>
+                  <input 
+                    type="text" required placeholder="e.g. ITM University / MITS"
+                    value={profileForm.college}
+                    onChange={(e) => setProfileForm({...profileForm, college: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch & Batch</label>
+                  <input 
+                    type="text" placeholder="e.g. CSE '28"
+                    value={profileForm.branch}
+                    onChange={(e) => setProfileForm({...profileForm, branch: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
+                  <textarea 
+                    rows={2} placeholder="What kind of outings do you like?"
+                    value={profileForm.bio}
+                    onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl resize-none"
+                  />
+                </div>
+
+                <button 
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3 bg-[#4D96FF] hover:bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition"
+                >
+                  {authLoading ? "Creating Profile..." : "Join MeetRa"}
+                </button>
+              </form>
+            </div>
+          )}
+
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------- MAIN APPLICATION (WHEN LOGGED IN) ---------------- //
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-between max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
       
@@ -679,7 +946,6 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Peer List with Clickable Inspection Modal */}
                 {mode === 'match' && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
@@ -726,7 +992,7 @@ export default function App() {
                     disabled={saving} onClick={handleConfirmAndSave}
                     className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition flex items-center justify-center gap-2"
                   >
-                    {saving ? "Saving to Database..." : `Confirm & Lock Plan (as ${userProfile.name})`}
+                    {saving ? "Saving to Database..." : `Confirm & Lock Plan`}
                     <Check className="w-4 h-4" />
                   </button>
                 </div>
@@ -747,7 +1013,6 @@ export default function App() {
         {activeTab === 'chat' && (
           <div className="space-y-4">
             {activeChatCollab ? (
-              /* Active Chat Conversation Room */
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
                 
                 {/* Header with Back Button */}
@@ -824,7 +1089,6 @@ export default function App() {
 
               </div>
             ) : (
-              /* Conversations Roster / Inbox View */
               <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
                 <div className="flex justify-between items-center border-b-2 border-slate-100 pb-3">
                   <div>
@@ -885,7 +1149,6 @@ export default function App() {
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
             <div className="flex items-center justify-between pb-3 border-b-2 border-slate-100">
               <div className="flex items-center gap-3">
-                {/* Photo Avatar with Initials Fallback */}
                 <div className="w-16 h-16 rounded-2xl border-2 border-slate-900 bg-amber-200 overflow-hidden flex items-center justify-center text-xl font-black shadow-[2px_2px_0px_#000] shrink-0">
                   {userProfile.avatar_url ? (
                     <img 
@@ -937,7 +1200,6 @@ export default function App() {
                 </span>
               </div>
 
-              {/* Pending Friend Requests */}
               {friendsList.filter(f => f.status === 'pending' && f.receiver_id === userProfile.id).length > 0 && (
                 <div className="p-3 bg-blue-50 border-2 border-slate-900 rounded-xl space-y-2">
                   <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">Friend Invites</span>
@@ -965,7 +1227,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Accepted Friends Roster */}
               <div className="space-y-1.5">
                 {friendsList.filter(f => f.status === 'accepted').length === 0 ? (
                   <p className="text-[11px] font-medium text-slate-400 italic">No campus friends added yet. Inspect peers on the Outings tab to connect!</p>
@@ -993,12 +1254,23 @@ export default function App() {
               </div>
             </div>
 
+            {/* Logout Action */}
+            <div className="pt-3 border-t-2 border-slate-100">
+              <button
+                onClick={handleLogout}
+                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-black uppercase tracking-wider rounded-xl border border-rose-300 transition flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout Account
+              </button>
+            </div>
+
           </div>
         )}
 
       </main>
 
-      {/* Inspecting Peer Modal (Feature #3 & Friend Request Trigger) */}
+      {/* Inspecting Peer Modal */}
       {inspectingPeer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
@@ -1055,7 +1327,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Add Friend Trigger */}
             {inspectingPeer.id !== userProfile.id && (
               <button
                 onClick={() => handleSendFriendRequest(inspectingPeer)}
@@ -1075,7 +1346,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit Profile Modal (Gallery Upload Only) */}
+      {/* Edit Profile Modal */}
       {isEditingProfile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1087,11 +1358,9 @@ export default function App() {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
-              {/* Profile Photo Upload */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-1.5">Profile Photo</label>
                 <div className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
-                  {/* Photo Preview */}
                   <div className="w-14 h-14 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
                     {profileForm.avatar_url ? (
                       <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
@@ -1102,23 +1371,16 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* Native Upload Button */}
                   <div className="flex-1 space-y-1">
                     <label className="inline-flex items-center justify-center px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-y-0.5 transition">
                       Upload from Gallery
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        onChange={handleFileUpload} 
-                        className="hidden" 
-                      />
+                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
                     </label>
                     <p className="text-[9px] font-bold text-slate-500">Auto-compressed for fast load</p>
                   </div>
                 </div>
               </div>
 
-              {/* Full Name */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
                 <input 
@@ -1129,7 +1391,6 @@ export default function App() {
                 />
               </div>
 
-              {/* College */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">College</label>
                 <input 
@@ -1140,7 +1401,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Branch & Year */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch & Batch</label>
                 <input 
@@ -1152,7 +1412,6 @@ export default function App() {
                 />
               </div>
 
-              {/* Bio */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
                 <textarea 
