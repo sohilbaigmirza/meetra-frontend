@@ -895,10 +895,11 @@ export default function App() {
                   </span>
                   <div className="flex gap-1.5">
                     {[
-                      { label: 'Any', value: 'all' },
-                      { label: '< ₹200', value: '200' },
-                      { label: '< ₹400', value: '400' }
-                    ].map(b => (
+                        { label: 'Any', value: 'all' },
+                        { label: '< ₹150', value: '150' },
+                        { label: '< ₹300', value: '300' },
+                        { label: '< ₹500', value: '500' }
+                      ].map(b => (
                       <button
                         key={b.value}
                         onClick={() => setActiveFeedBudget(b.value)}
