@@ -193,10 +193,23 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setCollabRequests(data);
-        // REMOVED: Auto-locking to data[0] so the inbox roster can be viewed
       }
     } catch (err) {
       console.error("Collabs fetch error:", err);
+    }
+  };
+
+  // Fetch Chat Messages
+  const fetchMessages = async (collabId) => {
+    if (!collabId) return;
+    try {
+      const res = await fetch(`${API_BASE}/chat/${collabId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch (err) {
+      console.error("Chat fetch error:", err);
     }
   };
 
@@ -265,30 +278,30 @@ export default function App() {
 
   // Generate Plan
   const handleGeneratePlan = async () => {
-  setLoading(true);
-  try {
-    const res = await fetch(`${API_BASE}/itinerary/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: userProfile.id,
-        available_hours: Number(hours),
-        budget: Number(budget),
-        location,
-        interests: selectedInterests,
-        outing_type: outingType,
-        is_solo: mode === 'solo'
-      })
-    });
-    const data = await res.json();
-    setPlan(data);
-    setActiveTab('outing');
-  } catch (err) {
-    console.error("Generator error:", err);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/itinerary/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userProfile.id,
+          available_hours: Number(hours),
+          budget: Number(budget),
+          location,
+          interests: selectedInterests,
+          outing_type: outingType,
+          is_solo: mode === 'solo'
+        })
+      });
+      const data = await res.json();
+      setPlan(data);
+      setActiveTab('outing');
+    } catch (err) {
+      console.error("Generator error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Lock & Save Outing
   const handleConfirmAndSave = async () => {
@@ -728,7 +741,7 @@ export default function App() {
           </div>
         )}
 
-{/* ==================== CHAT TAB ==================== */}
+        {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div className="space-y-4">
             {activeChatCollab ? (
