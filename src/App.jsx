@@ -253,6 +253,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: userProfile.id, // <--- PASS CURRENT USER ID HERE
           name: profileForm.name,
           college: profileForm.college,
           branch: profileForm.branch,
@@ -269,6 +270,7 @@ export default function App() {
         localStorage.setItem('meetra_user', JSON.stringify(updated));
         setIsEditingProfile(false);
         fetchCollabs(updated.id);
+        fetchFriends(updated.id);
         alert("Profile & photo saved to database!");
       }
     } catch (err) {
