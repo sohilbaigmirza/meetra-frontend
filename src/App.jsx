@@ -8,14 +8,14 @@ import {
   Users, 
   ArrowRight, 
   Star, 
-  ShieldCheck,
-  CheckCircle2,
-  Clock,
-  Navigation,
-  Check,
-  Edit3,
-  X,
-  Send
+  ShieldCheck, 
+  CheckCircle2, 
+  Clock, 
+  Navigation, 
+  Check, 
+  Edit3, 
+  X, 
+  Send 
 } from 'lucide-react';
 
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
@@ -118,49 +118,58 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Submit Review
-  const handleSubmitReview = async (e) => {
-    e.preventDefault();
-    if (!activeChatCollab) return;
-
-    const peerId = activeChatCollab.sender_id === userProfile.id 
-      ? activeChatCollab.receiver_id 
-      : activeChatCollab.sender_id;
-
+  // Fetch Friends List
+  const fetchFriends = async (userId) => {
+    if (!userId) return;
     try {
-      const res = await fetch(`${API_BASE}/reviews`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          collab_id: activeChatCollab.id,
-          reviewer_id: userProfile.id,
-          reviewer_name: userProfile.name,
-          reviewee_id: peerId,
-          rating: Number(ratingScore),
-          tags: selectedReviewTags,
-          feedback: reviewFeedback
-        })
-      });
-
+      const res = await fetch(`${API_BASE}/friends/${userId}`);
       if (res.ok) {
-        alert("Outing marked complete! Peer rating updated.");
-        setShowReviewModal(false);
-        setActiveChatCollab(null);
-        fetchCollabs(userProfile.id);
-        setActiveTab('home');
+        const data = await res.json();
+        setFriendsList(data);
       }
     } catch (err) {
-      console.error("Review submission error:", err);
+      console.error("Friends fetch error:", err);
     }
   };
 
-  useEffect(() => {
-    fetchOutings();
-    if (userProfile?.id) {
-      fetchCollabs(userProfile.id);
-      fetchFriends(userProfile.id);
+  // Send Friend Request
+  const handleSendFriendRequest = async (peer) => {
+    if (!userProfile?.id) return;
+    try {
+      const res = await fetch(`${API_BASE}/friends/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requester_id: userProfile.id,
+          requester_name: userProfile.name,
+          receiver_id: peer.id,
+          receiver_name: peer.name
+        })
+      });
+      if (res.ok) {
+        alert(`Friend request sent to ${peer.name}!`);
+        fetchFriends(userProfile.id);
+      }
+    } catch (err) {
+      console.error("Friend request error:", err);
     }
-  }, [userProfile?.id]);
+  };
+
+  // Accept/Reject Friend Request
+  const handleRespondFriend = async (friendshipId, status) => {
+    try {
+      const res = await fetch(`${API_BASE}/friends/${friendshipId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        fetchFriends(userProfile.id);
+      }
+    } catch (err) {
+      console.error("Friend response error:", err);
+    }
+  };
 
   // Fetch Outings
   const fetchOutings = async () => {
@@ -207,14 +216,16 @@ export default function App() {
     }
   };
 
+  // Initial Sync
   useEffect(() => {
     fetchOutings();
     if (userProfile?.id) {
       fetchCollabs(userProfile.id);
+      fetchFriends(userProfile.id);
     }
   }, [userProfile?.id]);
 
-  // Optimized chat polling (8s interval, pauses when tab is hidden)
+  // Optimized chat polling (8s interval, pauses when tab is blurred)
   useEffect(() => {
     if (activeChatCollab && activeTab === 'chat') {
       fetchMessages(activeChatCollab.id);
@@ -384,7 +395,7 @@ export default function App() {
     }
   };
 
-  // Send Chat Message with Optimistic Update
+  // Send Chat Message with Optimistic UI
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!newMessageText.trim() || !activeChatCollab) return;
@@ -419,6 +430,42 @@ export default function App() {
       }
     } catch (err) {
       console.error("Message send error:", err);
+    }
+  };
+
+  // Submit Outing Review
+  const handleSubmitReview = async (e) => {
+    e.preventDefault();
+    if (!activeChatCollab) return;
+
+    const peerId = activeChatCollab.sender_id === userProfile.id 
+      ? activeChatCollab.receiver_id 
+      : activeChatCollab.sender_id;
+
+    try {
+      const res = await fetch(`${API_BASE}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          collab_id: activeChatCollab.id,
+          reviewer_id: userProfile.id,
+          reviewer_name: userProfile.name,
+          reviewee_id: peerId,
+          rating: Number(ratingScore),
+          tags: selectedReviewTags,
+          feedback: reviewFeedback
+        })
+      });
+
+      if (res.ok) {
+        alert("Outing marked complete! Peer rating updated.");
+        setShowReviewModal(false);
+        setActiveChatCollab(null);
+        fetchCollabs(userProfile.id);
+        setActiveTab('home');
+      }
+    } catch (err) {
+      console.error("Review submission error:", err);
     }
   };
 
@@ -632,7 +679,7 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Peer List with clickable inspection modal */}
+                {/* Peer List with Clickable Inspection Modal */}
                 {mode === 'match' && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
@@ -829,6 +876,7 @@ export default function App() {
                 <p className="text-[10px] font-bold text-slate-500 uppercase">Collabs Completed</p>
               </div>
             </div>
+
             {/* Campus Friends & Incoming Requests */}
             <div className="pt-2 border-t-2 border-slate-100 space-y-3">
               <div className="flex justify-between items-center">
@@ -893,12 +941,13 @@ export default function App() {
                 )}
               </div>
             </div>
+
           </div>
         )}
 
       </main>
 
-      {/* Inspecting Peer Modal (Feature #3) */}
+      {/* Inspecting Peer Modal (Feature #3 & Friend Request Trigger) */}
       {inspectingPeer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
@@ -975,7 +1024,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit Profile Modal (Gallery Upload Only, No URL or Presets) */}
+      {/* Edit Profile Modal (Gallery Upload Only) */}
       {isEditingProfile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 max-h-[90vh] overflow-y-auto">
@@ -1168,56 +1217,3 @@ export default function App() {
     </div>
   );
 }
-
-// Fetch Friends
-  const fetchFriends = async (userId) => {
-    if (!userId) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/${userId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setFriendsList(data);
-      }
-    } catch (err) {
-      console.error("Friends fetch error:", err);
-    }
-  };
-
-  // Send Friend Request
-  const handleSendFriendRequest = async (peer) => {
-    if (!userProfile?.id) return;
-    try {
-      const res = await fetch(`${API_BASE}/friends/request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requester_id: userProfile.id,
-          requester_name: userProfile.name,
-          receiver_id: peer.id,
-          receiver_name: peer.name
-        })
-      });
-      if (res.ok) {
-        alert(`Friend request sent to ${peer.name}!`);
-        fetchFriends(userProfile.id);
-      }
-    } catch (err) {
-      console.error("Friend request error:", err);
-    }
-  };
-
-  // Accept/Reject Friend Request
-  const handleRespondFriend = async (friendshipId, status) => {
-    try {
-      const res = await fetch(`${API_BASE}/friends/${friendshipId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
-        fetchFriends(userProfile.id);
-      }
-    } catch (err) {
-      console.error("Friend response error:", err);
-    }
-  };
