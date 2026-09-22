@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { auth, googleProvider, signInWithPopup } from './firebase';
 import RouteMap from './components/RouteMap';
 import { 
   Home as HomeIcon, 
@@ -37,9 +38,7 @@ export default function App() {
   });
 
   // Auth Flow States
-  const [authStep, setAuthStep] = useState('phone'); // 'phone', 'otp', 'new_profile'
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otpCode, setOtpCode] = useState('');
+  
   const [authLoading, setAuthLoading] = useState(false);
 
   // Feed Filter & Wishlist States
@@ -258,11 +257,9 @@ export default function App() {
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to log out?")) {
+      auth.signOut();
       localStorage.removeItem('meetra_user');
       setUserProfile(null);
-      setAuthStep('phone');
-      setPhoneNumber('');
-      setOtpCode('');
       setActiveTab('home');
     }
   };
@@ -649,7 +646,41 @@ export default function App() {
   };
 
   // ---------------- RENDER LANDING & LOGIN IF NOT LOGGED IN ---------------- //
+  // ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
   if (!userProfile) {
+    const handleGoogleSignIn = async () => {
+      setAuthLoading(true);
+      try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+
+        // Send verified Google user info to Neon backend
+        const res = await fetch(`${API_BASE}/auth/google`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            firebase_uid: user.uid,
+            email: user.email,
+            name: user.displayName || "Student",
+            avatar_url: user.photoURL || null
+          })
+        });
+
+        if (res.ok) {
+          const dbUser = await res.json();
+          setUserProfile(dbUser);
+          localStorage.setItem('meetra_user', JSON.stringify(dbUser));
+        } else {
+          alert("Could not sync account with server. Please try again.");
+        }
+      } catch (err) {
+        console.error("Google Auth error:", err);
+        alert("Google Sign-In was cancelled or encountered an error.");
+      } finally {
+        setAuthLoading(false);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-center px-6 max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
         <div className="space-y-6">
@@ -664,164 +695,36 @@ export default function App() {
             <p className="text-xs font-bold text-slate-600">Zero awkward plans. Spontaneous college outings.</p>
           </div>
 
-          {/* STEP 1: Phone Number Input */}
-          {authStep === 'phone' && (
-            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4">
-              <div>
-                <span className="text-xs font-black uppercase text-slate-800">Student Sign In</span>
-                <h3 className="text-lg font-black text-slate-900 mt-0.5">Enter your mobile number</h3>
-                <p className="text-[11px] text-slate-500 font-semibold mt-1">We'll send an OTP to verify your campus identity.</p>
-              </div>
-
-              <form onSubmit={handleSendOtp} className="space-y-3">
-                <div className="flex items-center gap-2 border-2 border-slate-900 rounded-xl px-3 py-2 bg-slate-50 focus-within:bg-white transition">
-                  <span className="text-xs font-black text-slate-500">+91</span>
-                  <input 
-                    type="tel" 
-                    maxLength={10}
-                    placeholder="Enter 10-digit number"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                    className="w-full text-xs font-bold bg-transparent focus:outline-none text-slate-900"
-                    required
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  className="w-full py-3 bg-[#FF6B6B] hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-2"
-                >
-                  Continue
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+          {/* Clean Google One-Tap Card */}
+          <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-5">
+            <div>
+              <span className="text-xs font-black uppercase text-slate-800">Student Sign In</span>
+              <h3 className="text-lg font-black text-slate-900 mt-0.5">Continue with your college email</h3>
+              <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                No passwords or SMS delays. One click verifies your identity.
+              </p>
             </div>
-          )}
 
-          {/* STEP 2: OTP Verification (Test Pin 0000) */}
-          {authStep === 'otp' && (
-            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <span className="text-xs font-black uppercase text-slate-800">Verification</span>
-                  <h3 className="text-lg font-black text-slate-900 mt-0.5">Enter 4-Digit OTP</h3>
-                  <p className="text-[11px] text-slate-500 font-semibold mt-1">Sent to +91 {phoneNumber}</p>
-                </div>
-                <button 
-                  onClick={() => setAuthStep('phone')} 
-                  className="text-[10px] font-black underline text-slate-500 hover:text-slate-800"
-                >
-                  Edit Number
-                </button>
-              </div>
+            <button 
+              onClick={handleGoogleSignIn}
+              disabled={authLoading}
+              className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-3"
+            >
+              {/* Google G Logo SVG */}
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+              </svg>
+              {authLoading ? "Signing in..." : "Continue with Google"}
+            </button>
 
-              <form onSubmit={handleVerifyOtp} className="space-y-4">
-                <input 
-                  type="text" 
-                  maxLength={4}
-                  placeholder="• • • •"
-                  value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value)}
-                  className="w-full text-center text-2xl tracking-[0.5em] font-black border-2 border-slate-900 rounded-xl py-2 bg-slate-50 focus:bg-white focus:outline-none"
-                  autoFocus
-                  required
-                />
-
-                <div className="p-2.5 bg-amber-50 border border-slate-900 rounded-xl text-[10px] font-bold text-amber-900 flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 shrink-0" />
-                  <span>Test mode active: Enter OTP <b>0000</b></span>
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-2"
-                >
-                  {authLoading ? "Verifying..." : "Verify & Continue"}
-                  <Check className="w-4 h-4" />
-                </button>
-              </form>
+            <div className="p-2.5 bg-emerald-50 border border-slate-900 rounded-xl text-[10px] font-bold text-emerald-900 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Verified accounts get an automatic 5.0 Trust Badge.</span>
             </div>
-          )}
-
-          {/* STEP 3: New User College Profile Setup */}
-          {authStep === 'new_profile' && (
-            <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-4 max-h-[85vh] overflow-y-auto">
-              <div>
-                <span className="text-xs font-black uppercase text-slate-800">Welcome to MeetRa!</span>
-                <h3 className="text-lg font-black text-slate-900 mt-0.5">Create Your Student Card</h3>
-                <p className="text-[11px] text-slate-500 font-semibold mt-1">Peers will see this when matching for outings.</p>
-              </div>
-
-              <form onSubmit={handleCompleteRegistration} className="space-y-3">
-                {/* Photo Upload */}
-                <div>
-                  <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
-                    <div className="w-12 h-12 rounded-xl border border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0">
-                      {profileForm.avatar_url ? (
-                        <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-xs font-black text-slate-700">DP</span>
-                      )}
-                    </div>
-                    <label className="px-3 py-1.5 bg-white text-slate-900 border-2 border-slate-900 rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-slate-100 transition">
-                      Upload from Gallery
-                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                    </label>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
-                  <input 
-                    type="text" required placeholder="e.g. Sohil Mirza"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">College</label>
-                  <input 
-                    type="text" required placeholder="e.g. ITM University / MITS"
-                    value={profileForm.college}
-                    onChange={(e) => setProfileForm({...profileForm, college: e.target.value})}
-                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch & Batch</label>
-                  <input 
-                    type="text" placeholder="e.g. CSE '28"
-                    value={profileForm.branch}
-                    onChange={(e) => setProfileForm({...profileForm, branch: e.target.value})}
-                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
-                  <textarea 
-                    rows={2} placeholder="What kind of outings do you like?"
-                    value={profileForm.bio}
-                    onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
-                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl resize-none"
-                  />
-                </div>
-
-                <button 
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-3 bg-[#4D96FF] hover:bg-blue-600 text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition"
-                >
-                  {authLoading ? "Creating Profile..." : "Join MeetRa"}
-                </button>
-              </form>
-            </div>
-          )}
+          </div>
 
         </div>
       </div>
