@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import RouteMap from './components/RouteMap';
 import { 
   Home as HomeIcon, 
   Compass, 
@@ -1036,7 +1037,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ==================== OUTING TAB ==================== */}
+{/* ==================== OUTING TAB ==================== */}
         {activeTab === 'outing' && (
           <div className="space-y-4">
             {plan ? (
@@ -1070,6 +1071,62 @@ export default function App() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Milestone 2.3: OpenStreetMap Live Route & Transit Split */}
+                <div className="mt-5 pt-4 border-t-2 border-dashed border-slate-200 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
+                      <Navigation className="w-4 h-4 text-[#4D96FF]" /> Live Route & Transit Split
+                    </span>
+                    <span className="text-[9px] font-black px-1.5 py-0.5 bg-blue-100 border border-slate-900 rounded">
+                      OpenStreetMap
+                    </span>
+                  </div>
+
+                  {/* Leaflet + OpenStreetMap Route Component */}
+                  <RouteMap 
+                    startCoords={[26.2183, 78.1828]} 
+                    destCoords={[26.2045, 78.1945]} 
+                    destTitle={plan.timeline?.[0]?.title || "Campus Spot"}
+                  />
+
+                  {/* Per-Student Split Calculator */}
+                  <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
+                    <div className="p-2 bg-slate-50 border border-slate-900 rounded-xl">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase">E-Rickshaw</p>
+                      <p className="font-black text-slate-900">₹15 <span className="text-[9px] font-medium text-slate-500">/head</span></p>
+                    </div>
+                    <div className="p-2 bg-amber-50 border border-slate-900 rounded-xl">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase">Auto Split (÷2)</p>
+                      <p className="font-black text-[#FF6B6B]">₹35 <span className="text-[9px] font-medium text-slate-500">/head</span></p>
+                    </div>
+                    <div className="p-2 bg-blue-50 border border-slate-900 rounded-xl">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase">Rapido Pool</p>
+                      <p className="font-black text-[#4D96FF]">₹45 <span className="text-[9px] font-medium text-slate-500">/head</span></p>
+                    </div>
+                  </div>
+
+                  {/* Deep Links: Google Maps Directions & Ride Hailing */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(location)}&destination=${encodeURIComponent(plan.timeline?.[0]?.title || "City Center Gwalior")}&travelmode=driving`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2 bg-white hover:bg-slate-50 border-2 border-slate-900 text-slate-900 text-[11px] font-black rounded-xl text-center shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-1.5"
+                    >
+                      <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+                      Google Maps ↗
+                    </a>
+                    <a
+                      href="https://www.rapido.bike"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2 bg-amber-300 hover:bg-amber-400 border-2 border-slate-900 text-slate-900 text-[11px] font-black rounded-xl text-center shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-1.5"
+                    >
+                      🛵 Book Rapido
+                    </a>
+                  </div>
                 </div>
 
                 {mode === 'match' && plan.potential_peers && (
@@ -1134,7 +1191,6 @@ export default function App() {
             )}
           </div>
         )}
-
         {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div className="space-y-4">
