@@ -67,10 +67,46 @@ export default function App() {
   // Generator form states
   const [hours, setHours] = useState(3);
   const [budget, setBudget] = useState(300);
-  const [location, setLocation] = useState('Campus Main Gate');
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
   const [mode, setMode] = useState('match');
+
+  // Dynamic Start Location & Coordinates State
+  const [location, setLocation] = useState('MITS Main Gate');
+  const [startCoords, setStartCoords] = useState([26.2183, 78.1828]); // Default MITS coordinates
+  const [locating, setLocating] = useState(false);
+
+  // Common campus hubs with real GPS coords
+  const CAMPUS_HUBS = [
+    { name: "MITS Main Gate", coords: [26.2183, 78.1828] },
+    { name: "ITM Gate 1", coords: [26.1415, 78.2045] },
+    { name: "University Rd", coords: [26.2085, 78.1895] },
+    { name: "City Center", coords: [26.2045, 78.1945] },
+  ];
+
+  // Auto-detect browser GPS location
+  const handleDetectGPS = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setStartCoords(coords);
+        setLocation("Current GPS Location");
+        setLocating(false);
+      },
+      (err) => {
+        console.error("GPS error:", err);
+        alert("Could not fetch GPS. Please allow location permissions in your browser.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  };
   
   // Operational state
   const [loading, setLoading] = useState(false);
@@ -980,12 +1016,47 @@ export default function App() {
                 <input type="range" min="100" max="1500" step="50" value={budget} onChange={(e) => setBudget(e.target.value)} className="w-full accent-slate-900" />
               </div>
 
+              {/* Dynamic Start Location Selector */}
               <div>
-                <label className="text-xs font-black text-slate-800 block mb-1">Start Location</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-xs font-black text-slate-800">Start Location</label>
+                  <button
+                    type="button"
+                    onClick={handleDetectGPS}
+                    disabled={locating}
+                    className="text-[10px] font-black text-[#4D96FF] hover:underline flex items-center gap-1 active:translate-y-0.5"
+                  >
+                    📍 {locating ? "Detecting GPS..." : "Use Current Location"}
+                  </button>
+                </div>
+
                 <input 
-                  type="text" value={location} onChange={(e) => setLocation(e.target.value)}
+                  type="text" 
+                  value={location} 
+                  onChange={(e) => setLocation(e.target.value)}
                   className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border-2 border-slate-900 rounded-xl focus:bg-white focus:outline-none"
                 />
+
+                {/* Quick Campus Chips */}
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
+                  {CAMPUS_HUBS.map((hub) => (
+                    <button
+                      key={hub.name}
+                      type="button"
+                      onClick={() => {
+                        setLocation(hub.name);
+                        setStartCoords(hub.coords);
+                      }}
+                      className={`text-[10px] font-bold px-2 py-1 rounded-lg border border-slate-900 whitespace-nowrap transition ${
+                        location === hub.name 
+                          ? 'bg-slate-900 text-white shadow-[1px_1px_0px_#000]' 
+                          : 'bg-white text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {hub.name}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -1086,7 +1157,7 @@ export default function App() {
 
                   {/* Leaflet + OpenStreetMap Route Component */}
                   <RouteMap 
-                    startCoords={[26.2183, 78.1828]} 
+                    startCoords={startCoords} 
                     destCoords={[26.2045, 78.1945]} 
                     destTitle={plan.timeline?.[0]?.title || "Campus Spot"}
                   />
@@ -1110,7 +1181,7 @@ export default function App() {
                   {/* Deep Links: Google Maps Directions & Ride Hailing */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(location)}&destination=${encodeURIComponent(plan.timeline?.[0]?.title || "City Center Gwalior")}&travelmode=driving`}
+                      href={`https://www.google.com/maps/dir/?api=1&origin=${startCoords[0]},${startCoords[1]}&destination=${encodeURIComponent(plan.timeline?.[0]?.title || "City Center Gwalior")}&travelmode=driving`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="py-2 bg-white hover:bg-slate-50 border-2 border-slate-900 text-slate-900 text-[11px] font-black rounded-xl text-center shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-1.5"
