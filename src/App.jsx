@@ -1269,33 +1269,72 @@ export default function App() {
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
                 
                 {/* Header with Back Button */}
-                <div className="p-3 bg-amber-100 border-b-2 border-slate-900 flex justify-between items-center">
-                  <div className="flex items-center gap-2.5">
-                    <button 
-                      onClick={() => setActiveChatCollab(null)}
-                      className="p-1.5 bg-white hover:bg-slate-100 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
-                    >
-                      <ArrowLeft className="w-4 h-4 text-slate-900" />
-                    </button>
-                    <div>
-                      <h4 className="text-xs font-black text-slate-900">
-                        {activeChatCollab.sender_id === userProfile.id 
-                          ? activeChatCollab.receiver_name 
-                          : activeChatCollab.sender_name}
-                      </h4>
-                      <p className="text-[9px] text-slate-600 font-bold">
-                        Meeting: {location.includes("Gate") ? "Campus Tapri Point" : "Midway Spot"} • Split: ₹{Math.round((plan?.total_cost || 300) / 2)}
-                      </p>
+                {/* Combined Itinerary & Transit Header */}
+                <div className="p-3 bg-amber-100 border-b-2 border-slate-900 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setActiveChatCollab(null)}
+                        className="p-1.5 bg-white hover:bg-slate-100 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
+                      >
+                        <ArrowLeft className="w-4 h-4 text-slate-900" />
+                      </button>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900">
+                          {activeChatCollab.sender_id === userProfile.id 
+                            ? activeChatCollab.receiver_name 
+                            : activeChatCollab.sender_name}
+                        </h4>
+                        <p className="text-[10px] text-slate-600 font-bold">
+                          Collab #{activeChatCollab.id} • Match: {activeChatCollab.match_percentage}%
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => setShowReviewModal(true)}
-                      className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
+                      className="text-[10px] font-black bg-emerald-500 hover:bg-emerald-600 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000] transition active:translate-y-0.5"
                     >
                       Finish & Rate ✓
                     </button>
+                  </div>
+
+                  {/* Quick Transit Mini-Card */}
+                  <div className="bg-white/90 border border-slate-900 rounded-xl p-2 flex items-center justify-between text-[11px] shadow-[1px_1px_0px_#000]">
+                    <div>
+                      <span className="font-bold text-slate-500 text-[10px] block">MEETING & SPLIT</span>
+                      <span className="font-black text-slate-900">
+                        {location.includes("Gate") ? "Campus Tapri Point" : `Midway near ${location}`}
+                      </span>
+                      <span className="text-emerald-700 font-black ml-1.5">
+                        (₹{Math.round((plan?.total_cost || 300) / 2)} / student)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {/* One-Tap Share to Chat Thread */}
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const splitText = `📍 Meetup point: ${location.includes("Gate") ? "Campus Tapri Point" : location}. Estimated transit split: ₹${Math.round((plan?.total_cost || 300) / 2)} per head. Ready?`;
+                          setNewMessageText(splitText);
+                        }}
+                        className="px-2 py-1 bg-amber-200 hover:bg-amber-300 text-slate-900 text-[10px] font-black rounded-lg border border-slate-900 transition"
+                        title="Draft split details into input"
+                      >
+                        Share Split 💬
+                      </button>
+
+                      <a
+                        href={`https://www.google.com/maps/dir/?api=1&origin=${startCoords[0]},${startCoords[1]}&destination=${encodeURIComponent(plan?.timeline?.[0]?.title || "City Center Gwalior")}&travelmode=driving`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 bg-slate-100 hover:bg-white text-slate-900 rounded-lg border border-slate-900"
+                        title="Open Maps"
+                      >
+                        <Navigation className="w-3.5 h-3.5 text-blue-600" />
+                      </a>
+                    </div>
                   </div>
                 </div>
 
