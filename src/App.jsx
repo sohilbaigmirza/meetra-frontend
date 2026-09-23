@@ -20,8 +20,6 @@ import {
   X, 
   Send,
   LogOut,
-  Phone,
-  KeyRound,
   Bookmark,
   Filter
 } from 'lucide-react';
@@ -31,34 +29,69 @@ const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   
-  // User Profile State (Starts as null so new users see the login page)
+  // User Profile State
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('meetra_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Auth Flow States
-  
   const [authLoading, setAuthLoading] = useState(false);
 
   // Feed Filter & Wishlist States
   const [activeFeedTag, setActiveFeedTag] = useState('All');
-  const [activeFeedBudget, setActiveFeedBudget] = useState('all'); // 'all', '200', '400'
+  const [activeFeedBudget, setActiveFeedBudget] = useState('all');
   const [bookmarkedOutingIds, setBookmarkedOutingIds] = useState([]);
   const [savedWishlistOutings, setSavedWishlistOutings] = useState([]);
 
-  // Profile Edit / Setup Form
+  // Detailed Profile Edit / Setup Form
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: '',
+    age: 19,
     college: 'ITM University',
-    branch: "CSE '28",
-    bio: 'Up for budget cafe hangouts & street food trails!',
+    course: 'B.Tech',
+    branchName: 'CSE',
+    year: '1st Year',
+    bio: 'Up for quick cafe hangouts & street food trails!',
     avatar_url: null,
     interests: ['Food', 'Cafes'],
     preferred_outing_types: ['Budget Cafes', 'Heritage Walk'],
     budget_preference: 300
   });
+
+  const COLLEGES = [
+    "ITM University",
+    "ITM Universe",
+    "MITS Gwalior",
+    "Amity University Gwalior",
+    "IPS College",
+    "Jiwaji University",
+    "Other"
+  ];
+
+  const COURSES = [
+    "B.Tech",
+    "B.Pharma",
+    "BCA",
+    "MCA",
+    "BBA",
+    "MBA",
+    "Agriculture",
+    "Other"
+  ];
+
+  const BTECH_BRANCHES = [
+    "CSE",
+    "IT",
+    "AIML",
+    "DS",
+    "IOT",
+    "Cyber Security",
+    "Mechanical",
+    "Civil"
+  ];
+
+  const YEARS = ["1st Year", "2nd Year", "3rd Year", "4th Year", "Postgrad"];
 
   const [inspectingPeer, setInspectingPeer] = useState(null);
   const [friendsList, setFriendsList] = useState([]);
@@ -72,10 +105,9 @@ export default function App() {
 
   // Dynamic Start Location & Coordinates State
   const [location, setLocation] = useState('MITS Main Gate');
-  const [startCoords, setStartCoords] = useState([26.2183, 78.1828]); // Default MITS coordinates
+  const [startCoords, setStartCoords] = useState([26.2183, 78.1828]);
   const [locating, setLocating] = useState(false);
 
-  // Common campus hubs with real GPS coords
   const CAMPUS_HUBS = [
     { name: "MITS Main Gate", coords: [26.2183, 78.1828] },
     { name: "ITM Gate 1", coords: [26.1415, 78.2045] },
@@ -83,7 +115,6 @@ export default function App() {
     { name: "City Center", coords: [26.2045, 78.1945] },
   ];
 
-  // Auto-detect browser GPS location
   const handleDetectGPS = () => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser.");
@@ -127,7 +158,6 @@ export default function App() {
   const [selectedReviewTags, setSelectedReviewTags] = useState(["Punctual", "Friendly"]);
   const [reviewFeedback, setReviewFeedback] = useState("");
 
-  // Gallery File Upload & On-Device Auto Compression
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -169,90 +199,6 @@ export default function App() {
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
-  };
-
-  // ---------------- AUTHENTICATION HANDLERS ---------------- //
-  const handleSendOtp = (e) => {
-    e.preventDefault();
-    if (phoneNumber.trim().length < 10) {
-      alert("Please enter a valid 10-digit mobile number.");
-      return;
-    }
-    setAuthStep('otp');
-  };
-
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
-    if (otpCode !== '0000') {
-      alert("Invalid OTP. Use test PIN: 0000");
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/auth/phone-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneNumber.trim() })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (!data.is_new_user && data.user) {
-          // Existing User Login
-          setUserProfile(data.user);
-          localStorage.setItem('meetra_user', JSON.stringify(data.user));
-          setAuthStep('phone');
-        } else {
-          // New User -> Prompt Profile Creation
-          setAuthStep('new_profile');
-        }
-      }
-    } catch (err) {
-      console.error("Auth error:", err);
-      // Offline fallback: prompt profile setup
-      setAuthStep('new_profile');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleCompleteRegistration = async (e) => {
-    e.preventDefault();
-    if (!profileForm.name.trim()) {
-      alert("Please enter your name.");
-      return;
-    }
-
-    setAuthLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/users/profile`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone_or_email: phoneNumber.trim(),
-          name: profileForm.name.trim(),
-          college: profileForm.college.trim(),
-          branch: profileForm.branch.trim(),
-          bio: profileForm.bio.trim(),
-          avatar_url: profileForm.avatar_url,
-          interests: profileForm.interests || ["Food", "Cafes"],
-          preferred_outing_types: profileForm.preferred_outing_types || ["Budget Cafes"],
-          budget_preference: Number(profileForm.budget_preference || 300)
-        })
-      });
-
-      if (res.ok) {
-        const newUser = await res.json();
-        setUserProfile(newUser);
-        localStorage.setItem('meetra_user', JSON.stringify(newUser));
-        setAuthStep('phone');
-      }
-    } catch (err) {
-      console.error("Registration error:", err);
-    } finally {
-      setAuthLoading(false);
-    }
   };
 
   const handleLogout = () => {
@@ -315,7 +261,6 @@ export default function App() {
     }
   };
 
-  // Fetch Outings with Active Filters
   const fetchOutings = async (tag = activeFeedTag, budget = activeFeedBudget) => {
     try {
       let url = `${API_BASE}/outings?`;
@@ -332,7 +277,6 @@ export default function App() {
     }
   };
 
-  // Fetch Bookmarked Wishlist
   const fetchBookmarks = async (userId) => {
     if (!userId) return;
     try {
@@ -347,7 +291,6 @@ export default function App() {
     }
   };
 
-  // Toggle Bookmark
   const handleToggleBookmark = async (outingId) => {
     if (!userProfile?.id) return;
     try {
@@ -433,6 +376,10 @@ export default function App() {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
+    const formattedBranch = profileForm.course === 'B.Tech'
+      ? `B.Tech ${profileForm.branchName} • ${profileForm.year}`
+      : `${profileForm.course} • ${profileForm.year}`;
+
     try {
       const res = await fetch(`${API_BASE}/users/profile`, {
         method: 'POST',
@@ -440,8 +387,9 @@ export default function App() {
         body: JSON.stringify({
           id: userProfile.id,
           name: profileForm.name,
+          age: Number(profileForm.age || 19),
           college: profileForm.college,
-          branch: profileForm.branch,
+          branch: formattedBranch,
           bio: profileForm.bio,
           avatar_url: profileForm.avatar_url,
           interests: profileForm.interests || ["Food", "Cafes"],
@@ -456,7 +404,7 @@ export default function App() {
         setIsEditingProfile(false);
         fetchCollabs(updated.id);
         fetchFriends(updated.id);
-        alert("Profile & photo saved to database!");
+        alert("Profile personalized and saved to database!");
       }
     } catch (err) {
       console.error("Profile save error:", err);
@@ -528,6 +476,18 @@ export default function App() {
 
   const handleSendInvite = async (peer) => {
     if (!userProfile?.id) return;
+
+    const existing = collabRequests.find(
+      c => (c.sender_id === peer.id || c.receiver_id === peer.id) && c.status === 'accepted'
+    );
+
+    if (existing) {
+      alert(`You are already connected with ${peer.name}! Opening chat.`);
+      setActiveChatCollab(existing);
+      setActiveTab('chat');
+      return;
+    }
+
     const activeOutingId = plan?.id || (savedOutings.length > 0 ? savedOutings[0].id : 1);
     try {
       const res = await fetch(`${API_BASE}/collabs`, {
@@ -645,7 +605,7 @@ export default function App() {
     }
   };
 
-// ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
+  // ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
   if (!userProfile) {
     const handleGoogleSignIn = async () => {
       setAuthLoading(true);
@@ -665,9 +625,26 @@ export default function App() {
         });
 
         if (res.ok) {
-          const dbUser = await res.json();
+          const data = await res.json();
+          const dbUser = data.user;
           setUserProfile(dbUser);
           localStorage.setItem('meetra_user', JSON.stringify(dbUser));
+          
+          setProfileForm({
+            name: dbUser.name || '',
+            age: dbUser.age || 19,
+            college: dbUser.college || 'ITM University',
+            course: 'B.Tech',
+            branchName: 'CSE',
+            year: '1st Year',
+            bio: dbUser.bio || 'Up for quick cafe hangouts & street food trails!',
+            avatar_url: dbUser.avatar_url || null,
+            interests: dbUser.interests || ['Food', 'Cafes']
+          });
+
+          if (data.is_new_user) {
+            setIsEditingProfile(true);
+          }
         } else {
           alert("Could not sync account with database. Please try again.");
         }
@@ -808,7 +785,6 @@ export default function App() {
 
               {/* Filter Bar: Tags & Budget */}
               <div className="space-y-2 pt-1 border-t border-slate-100">
-                {/* Category Chips */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
                   {['All', 'Food', 'Cafes', 'Heritage', 'Budget'].map(tag => (
                     <button
@@ -823,18 +799,17 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Budget Quick Toggles */}
                 <div className="flex items-center justify-between text-[11px] font-bold text-slate-600">
                   <span className="flex items-center gap-1">
                     <Filter className="w-3.5 h-3.5" /> Max Budget:
                   </span>
                   <div className="flex gap-1.5">
                     {[
-                        { label: 'Any', value: 'all' },
-                        { label: '< ₹150', value: '150' },
-                        { label: '< ₹300', value: '300' },
-                        { label: '< ₹500', value: '500' }
-                      ].map(b => (
+                      { label: 'Any', value: 'all' },
+                      { label: '< ₹150', value: '150' },
+                      { label: '< ₹300', value: '300' },
+                      { label: '< ₹500', value: '500' }
+                    ].map(b => (
                       <button
                         key={b.value}
                         onClick={() => setActiveFeedBudget(b.value)}
@@ -849,7 +824,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Feed List with Bookmark Star */}
               {savedOutings.length === 0 ? (
                 <p className="text-[11px] text-slate-400 italic py-2 text-center">No community outings match the selected filters.</p>
               ) : (
@@ -892,7 +866,7 @@ export default function App() {
               )}
             </div>
 
-            {/* Form */}
+            {/* Plan Outing Form */}
             <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000] space-y-4">
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wide flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-[#FF6B6B]" /> Plan Your Outing
@@ -935,7 +909,6 @@ export default function App() {
                   className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border-2 border-slate-900 rounded-xl focus:bg-white focus:outline-none"
                 />
 
-                {/* Quick Campus Chips */}
                 <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
                   {CAMPUS_HUBS.map((hub) => (
                     <button
@@ -1006,7 +979,7 @@ export default function App() {
           </div>
         )}
 
-{/* ==================== OUTING TAB ==================== */}
+        {/* ==================== OUTING TAB ==================== */}
         {activeTab === 'outing' && (
           <div className="space-y-4">
             {plan ? (
@@ -1053,14 +1026,12 @@ export default function App() {
                     </span>
                   </div>
 
-                  {/* Leaflet + OpenStreetMap Route Component */}
                   <RouteMap 
                     startCoords={startCoords} 
                     destCoords={[26.2045, 78.1945]} 
                     destTitle={plan.timeline?.[0]?.title || "Campus Spot"}
                   />
 
-                  {/* Per-Student Split Calculator */}
                   <div className="grid grid-cols-3 gap-1.5 text-center text-xs">
                     <div className="p-2 bg-slate-50 border border-slate-900 rounded-xl">
                       <p className="text-[9px] font-bold text-slate-500 uppercase">E-Rickshaw</p>
@@ -1076,7 +1047,6 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Deep Links: Google Maps Directions & Ride Hailing */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <a
                       href={`https://www.google.com/maps/dir/?api=1&origin=${startCoords[0]},${startCoords[1]}&destination=${encodeURIComponent(plan.timeline?.[0]?.title || "City Center Gwalior")}&travelmode=driving`}
@@ -1160,13 +1130,13 @@ export default function App() {
             )}
           </div>
         )}
+
         {/* ==================== CHAT TAB ==================== */}
         {activeTab === 'chat' && (
           <div className="space-y-4">
             {activeChatCollab ? (
               <div className="flex flex-col h-[70vh] bg-white border-2 border-slate-900 rounded-2xl shadow-[4px_4px_0px_#000] overflow-hidden">
                 
-                {/* Header with Back Button */}
                 {/* Combined Itinerary & Transit Header */}
                 <div className="p-3 bg-amber-100 border-b-2 border-slate-900 space-y-2">
                   <div className="flex justify-between items-center">
@@ -1210,7 +1180,6 @@ export default function App() {
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      {/* One-Tap Share to Chat Thread */}
                       <button
                         type="button"
                         onClick={async () => {
@@ -1292,43 +1261,58 @@ export default function App() {
                   </span>
                 </div>
 
-                {collabRequests.filter(c => c.status === 'accepted').length === 0 ? (
-                  <div className="text-center py-12 space-y-3">
-                    <MessageSquare className="w-10 h-10 text-slate-300 mx-auto" />
-                    <p className="text-xs font-bold text-slate-500">No accepted chats yet.</p>
-                    <p className="text-[11px] text-slate-400">Accept an invite on the Home tab or send an outing request to start chatting!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {collabRequests
-                      .filter(c => c.status === 'accepted')
-                      .map((collab) => {
-                        const peerName = collab.sender_id === userProfile.id 
-                          ? collab.receiver_name 
-                          : collab.sender_name;
-                        return (
-                          <div 
-                            key={collab.id}
-                            onClick={() => setActiveChatCollab(collab)}
-                            className="p-3 bg-slate-50 hover:bg-amber-50 border-2 border-slate-900 rounded-xl flex items-center justify-between shadow-[2px_2px_0px_#000] cursor-pointer transition"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl border border-slate-900 bg-amber-200 flex items-center justify-center font-black text-xs">
-                                {peerName.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div>
-                                <h4 className="text-xs font-black text-slate-900">{peerName}</h4>
-                                <p className="text-[10px] font-bold text-slate-500">Collab #{collab.id} • Match: {collab.match_percentage}%</p>
-                              </div>
+                {(() => {
+                  const acceptedCollabs = collabRequests.filter(c => c.status === 'accepted');
+
+                  const uniquePeersMap = new Map();
+                  acceptedCollabs.forEach(collab => {
+                    const peerId = collab.sender_id === userProfile.id ? collab.receiver_id : collab.sender_id;
+                    const peerName = collab.sender_id === userProfile.id ? collab.receiver_name : collab.sender_name;
+                    
+                    if (!uniquePeersMap.has(peerId) || uniquePeersMap.get(peerId).id < collab.id) {
+                      uniquePeersMap.set(peerId, { ...collab, peerName, peerId });
+                    }
+                  });
+
+                  const uniqueConversations = Array.from(uniquePeersMap.values());
+
+                  if (uniqueConversations.length === 0) {
+                    return (
+                      <div className="text-center py-12 space-y-3">
+                        <MessageSquare className="w-10 h-10 text-slate-300 mx-auto" />
+                        <p className="text-xs font-bold text-slate-500">No active chats yet.</p>
+                        <p className="text-[11px] text-slate-400">Accept an invite on the Home tab or send an outing request to start chatting!</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-2">
+                      {uniqueConversations.map((convo) => (
+                        <div 
+                          key={convo.peerId}
+                          onClick={() => setActiveChatCollab(convo)}
+                          className="p-3 bg-slate-50 hover:bg-amber-50 border-2 border-slate-900 rounded-xl flex items-center justify-between shadow-[2px_2px_0px_#000] cursor-pointer transition"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl border border-slate-900 bg-amber-200 flex items-center justify-center font-black text-xs shadow-[1px_1px_0px_#000]">
+                              {convo.peerName.slice(0, 2).toUpperCase()}
                             </div>
-                            <span className="text-xs font-black bg-emerald-400 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000]">
-                              Open Chat →
-                            </span>
+                            <div>
+                              <h4 className="text-xs font-black text-slate-900">{convo.peerName}</h4>
+                              <p className="text-[10px] font-bold text-slate-500">
+                                Latest Outing #{convo.outing_id} • Match: {convo.match_percentage}%
+                              </p>
+                            </div>
                           </div>
-                        );
-                      })}
-                  </div>
-                )}
+                          <span className="text-xs font-black bg-emerald-400 text-white px-2.5 py-1 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000]">
+                            Open Chat →
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
@@ -1352,8 +1336,16 @@ export default function App() {
                   )}
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">{userProfile.name}</h3>
-                  <p className="text-xs font-bold text-slate-500">{userProfile.college} • {userProfile.branch || "Student"}</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-slate-900">{userProfile.name}</h3>
+                    {userProfile.age && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-slate-700">
+                        {userProfile.age} yrs
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs font-bold text-slate-600">{userProfile.college}</p>
+                  <p className="text-[11px] font-bold text-slate-500">{userProfile.branch || "Student"}</p>
                   <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
                     <span>{userProfile.rating} Compatibility Rating</span>
@@ -1361,7 +1353,20 @@ export default function App() {
                 </div>
               </div>
               <button 
-                onClick={() => { setProfileForm(userProfile); setIsEditingProfile(true); }}
+                onClick={() => {
+                  setProfileForm({
+                    name: userProfile.name || '',
+                    age: userProfile.age || 19,
+                    college: userProfile.college || 'ITM University',
+                    course: 'B.Tech',
+                    branchName: 'CSE',
+                    year: '1st Year',
+                    bio: userProfile.bio || '',
+                    avatar_url: userProfile.avatar_url || null,
+                    interests: userProfile.interests || ['Food', 'Cafes']
+                  });
+                  setIsEditingProfile(true);
+                }}
                 className="p-2 border-2 border-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl shadow-[2px_2px_0px_#000] transition active:translate-y-0.5"
               >
                 <Edit3 className="w-4 h-4 text-slate-800" />
@@ -1512,7 +1517,14 @@ export default function App() {
                 )}
               </div>
               <div>
-                <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
+                  {inspectingPeer.age && (
+                    <span className="text-[10px] font-black px-1.5 py-0.5 bg-slate-100 border border-slate-900 rounded-md text-slate-700">
+                      {inspectingPeer.age} yrs
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs font-bold text-slate-500">{inspectingPeer.college || "Campus Member"}</p>
                 <div className="flex items-center gap-1 text-[11px] font-black text-amber-600 mt-0.5">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
@@ -1571,75 +1583,116 @@ export default function App() {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase">Edit Profile & Photo</h3>
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase">Customize Student Profile</h3>
+                <p className="text-[10px] text-slate-500 font-bold">Personalize your college credentials</p>
+              </div>
               <button onClick={() => setIsEditingProfile(false)}>
                 <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
               </button>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
+              {/* Photo */}
               <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-1.5">Profile Photo</label>
-                <div className="flex items-center gap-3 p-3 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
-                  <div className="w-14 h-14 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
+                <div className="flex items-center gap-3 p-2 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
+                  <div className="w-12 h-12 rounded-xl border-2 border-slate-900 bg-amber-100 overflow-hidden flex items-center justify-center shrink-0">
                     {profileForm.avatar_url ? (
                       <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-sm font-black text-slate-700">
-                        {profileForm.name?.slice(0, 2).toUpperCase()}
-                      </span>
+                      <span className="text-sm font-black text-slate-700">DP</span>
                     )}
                   </div>
-
-                  <div className="flex-1 space-y-1">
-                    <label className="inline-flex items-center justify-center px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-900 rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-y-0.5 transition">
-                      Upload from Gallery
-                      <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
-                    </label>
-                    <p className="text-[9px] font-bold text-slate-500">Auto-compressed for fast load</p>
-                  </div>
+                  <label className="px-3 py-1 bg-white hover:bg-slate-100 text-slate-900 border border-slate-900 rounded-lg text-xs font-black cursor-pointer shadow-[1px_1px_0px_#000]">
+                    Upload New
+                    <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  </label>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
-                <input 
-                  type="text" required 
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
-                />
+              {/* Name & Age */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
+                  <input 
+                    type="text" required 
+                    value={profileForm.name}
+                    onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Age</label>
+                  <input 
+                    type="number" min="16" max="35" required 
+                    value={profileForm.age || 19}
+                    onChange={(e) => setProfileForm({...profileForm, age: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl"
+                  />
+                </div>
               </div>
 
+              {/* College Dropdown */}
               <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">College</label>
-                <input 
-                  type="text" required 
+                <label className="text-[11px] font-black text-slate-700 block mb-0.5">College / Campus</label>
+                <select
                   value={profileForm.college}
                   onChange={(e) => setProfileForm({...profileForm, college: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
-                />
+                  className="w-full px-3 py-1.5 text-xs font-black border-2 border-slate-900 rounded-xl bg-slate-50 focus:bg-white"
+                >
+                  {COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
 
-              <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Branch & Batch</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. CSE '28, ECE '27"
-                  value={profileForm.branch || ""}
-                  onChange={(e) => setProfileForm({...profileForm, branch: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none"
-                />
+              {/* Course & Year */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Course</label>
+                  <select
+                    value={profileForm.course}
+                    onChange={(e) => setProfileForm({...profileForm, course: e.target.value})}
+                    className="w-full px-2.5 py-1.5 text-xs font-black border-2 border-slate-900 rounded-xl bg-slate-50 focus:bg-white"
+                  >
+                    {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Year</label>
+                  <select
+                    value={profileForm.year}
+                    onChange={(e) => setProfileForm({...profileForm, year: e.target.value})}
+                    className="w-full px-2.5 py-1.5 text-xs font-black border-2 border-slate-900 rounded-xl bg-slate-50 focus:bg-white"
+                  >
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
               </div>
 
+              {/* Conditional Branch Dropdown for B.Tech */}
+              {profileForm.course === 'B.Tech' && (
+                <div>
+                  <label className="text-[11px] font-black text-slate-700 block mb-0.5">Engineering Branch</label>
+                  <select
+                    value={profileForm.branchName}
+                    onChange={(e) => setProfileForm({...profileForm, branchName: e.target.value})}
+                    className="w-full px-3 py-1.5 text-xs font-black border-2 border-slate-900 rounded-xl bg-amber-50 focus:bg-white"
+                  >
+                    {BTECH_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              )}
+
+              {/* Bio & Hobbies */}
               <div>
-                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio</label>
+                <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio (Optional)</label>
                 <textarea 
                   rows={2}
-                  placeholder="Tell peers what kind of outings you like..."
+                  placeholder="e.g. Up for rooftop cafes, street food, and weekend badminton!"
                   value={profileForm.bio || ""}
                   onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
-                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl focus:outline-none resize-none"
+                  className="w-full px-3 py-1.5 text-xs font-semibold border-2 border-slate-900 rounded-xl resize-none"
                 />
               </div>
 
@@ -1647,7 +1700,7 @@ export default function App() {
                 type="submit"
                 className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77] active:translate-y-0.5 transition"
               >
-                Save Profile to Neon DB
+                Save Personalized Profile
               </button>
             </form>
           </div>
