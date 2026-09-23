@@ -18,10 +18,14 @@ import {
   Check, 
   Edit3, 
   X, 
-  Send,
-  LogOut,
-  Bookmark,
-  Filter
+  Send, 
+  LogOut, 
+  Bookmark, 
+  Filter,
+  Tag,
+  Ticket,
+  Calendar,
+  PhoneCall
 } from 'lucide-react';
 
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
@@ -43,7 +47,17 @@ export default function App() {
   const [bookmarkedOutingIds, setBookmarkedOutingIds] = useState([]);
   const [savedWishlistOutings, setSavedWishlistOutings] = useState([]);
 
-  // Detailed Profile Edit / Setup Form
+  // Milestone 3.1: Partner Cafes & Spot Pre-Bookings State
+  const [partnerCafes, setPartnerCafes] = useState([]);
+  const [userBookings, setUserBookings] = useState([]);
+  const [selectedCafeForBooking, setSelectedCafeForBooking] = useState(null);
+  const [bookingPartySize, setBookingPartySize] = useState(2);
+  const [bookingTime, setBookingTime] = useState("6:00 PM");
+  const [bookingDate, setBookingDate] = useState("Today");
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [confirmedBookingPass, setConfirmedBookingPass] = useState(null);
+
+  // Profile Edit / Setup Form
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({
     name: '',
@@ -101,7 +115,7 @@ export default function App() {
   const [budget, setBudget] = useState(300);
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
-  const [mode, setMode] = useState('match'); // 'solo' | 'match' | 'group'
+  const [mode, setMode] = useState('match');
 
   // Dynamic Start Location & Coordinates State
   const [location, setLocation] = useState('MITS Main Gate');
@@ -211,6 +225,31 @@ export default function App() {
   };
 
   // ---------------- DATA FETCHING ---------------- //
+  const fetchPartners = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/partners`);
+      if (res.ok) {
+        const data = await res.json();
+        setPartnerCafes(data);
+      }
+    } catch (err) {
+      console.error("Partner cafes fetch error:", err);
+    }
+  };
+
+  const fetchUserBookings = async (userId) => {
+    if (!userId) return;
+    try {
+      const res = await fetch(`${API_BASE}/partners/bookings/user/${userId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUserBookings(data);
+      }
+    } catch (err) {
+      console.error("Bookings fetch error:", err);
+    }
+  };
+
   const fetchFriends = async (userId) => {
     if (!userId) return;
     try {
@@ -348,10 +387,12 @@ export default function App() {
 
   useEffect(() => {
     fetchOutings(activeFeedTag, activeFeedBudget);
+    fetchPartners();
     if (userProfile?.id) {
       fetchCollabs(userProfile.id);
       fetchFriends(userProfile.id);
       fetchBookmarks(userProfile.id);
+      fetchUserBookings(userProfile.id);
     }
   }, [userProfile?.id, activeFeedTag, activeFeedBudget]);
 
@@ -622,6 +663,42 @@ export default function App() {
     }
   };
 
+  // ---------------- PARTNER CAFE PRE-BOOKING HANDLER ---------------- //
+  const handleCreateBooking = async (e) => {
+    e.preventDefault();
+    if (!selectedCafeForBooking || !userProfile) return;
+
+    setBookingLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/partners/book`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userProfile.id,
+          user_name: userProfile.name,
+          user_phone_or_email: userProfile.phone_or_email,
+          cafe_id: selectedCafeForBooking.id,
+          cafe_name: selectedCafeForBooking.name,
+          party_size: Number(bookingPartySize),
+          booking_time: bookingTime,
+          booking_date: bookingDate
+        })
+      });
+
+      if (res.ok) {
+        const booking = await res.json();
+        setConfirmedBookingPass(booking);
+        fetchUserBookings(userProfile.id);
+      } else {
+        alert("Could not complete booking. Please try again.");
+      }
+    } catch (err) {
+      console.error("Booking error:", err);
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   // ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
   if (!userProfile) {
     const handleGoogleSignIn = async () => {
@@ -676,7 +753,6 @@ export default function App() {
     return (
       <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-center px-6 max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
         <div className="space-y-6">
-          
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 bg-white border-2 border-slate-900 px-3 py-1 rounded-full shadow-[2px_2px_0px_#000]">
               <Sparkles className="w-4 h-4 text-[#FF6B6B]" />
@@ -714,7 +790,6 @@ export default function App() {
               <span>Verified accounts get an automatic 5.0 Trust Badge.</span>
             </div>
           </div>
-
         </div>
       </div>
     );
@@ -731,7 +806,7 @@ export default function App() {
             <span className="text-xl font-black tracking-tight text-slate-900">MeetRa</span>
             <span className="text-[10px] bg-[#FF6B6B] text-white px-2 py-0.5 rounded-full font-bold tracking-wide">GEN-Z</span>
           </div>
-          <p className="text-[11px] text-slate-500 font-bold">College Outings & Compatibility</p>
+          <p className="text-[11px] text-slate-500 font-bold">College Outings & Commercial Spots</p>
         </div>
 
         <button 
@@ -750,7 +825,7 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
             
-            {/* Top Banner */}
+            {/* Top Greeting Banner */}
             <div className="bg-[#FFE66D] border-2 border-slate-900 rounded-2xl p-5 shadow-[4px_4px_0px_#000]">
               <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 bg-white/70 px-2 py-0.5 rounded-md border border-slate-900">
                 Mood & Daily Outings
@@ -760,6 +835,51 @@ export default function App() {
                 Zero awkward plans. Input your free hours and pocket cash to build a custom outing.
               </p>
             </div>
+
+            {/* Milestone 3.1: Partner Spotlights Carousel */}
+            {partnerCafes.length > 0 && (
+              <div className="bg-white border-2 border-slate-900 rounded-2xl p-4 shadow-[4px_4px_0px_#000] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-[#FF6B6B]" /> Partner Cafes & Discounts
+                  </span>
+                  <span className="text-[9px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-800 border border-slate-900 rounded">
+                    Verified
+                  </span>
+                </div>
+
+                <div className="flex gap-3 overflow-x-auto pb-1.5 pt-0.5">
+                  {partnerCafes.map((cafe) => (
+                    <div 
+                      key={cafe.id} 
+                      className="min-w-[210px] bg-slate-50 border-2 border-slate-900 rounded-xl overflow-hidden shadow-[2px_2px_0px_#000] flex flex-col justify-between"
+                    >
+                      <div className="h-24 bg-slate-200 relative overflow-hidden">
+                        {cafe.cover_image && (
+                          <img src={cafe.cover_image} alt={cafe.name} className="w-full h-full object-cover" />
+                        )}
+                        <span className="absolute top-2 left-2 bg-[#FF6B6B] text-white text-[9px] font-black px-2 py-0.5 rounded-md border border-slate-900 shadow-[1px_1px_0px_#000]">
+                          {cafe.discount_text}
+                        </span>
+                      </div>
+                      <div className="p-2.5 space-y-1">
+                        <h4 className="text-xs font-black text-slate-900 truncate">{cafe.name}</h4>
+                        <p className="text-[10px] text-slate-600 font-bold">{cafe.landmark} • {cafe.category}</p>
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-[10px] font-black text-emerald-700">Min ~₹{cafe.min_spend}</span>
+                          <button
+                            onClick={() => setSelectedCafeForBooking(cafe)}
+                            className="px-2.5 py-1 text-[10px] font-black bg-slate-900 text-white rounded-lg border border-slate-900 hover:bg-slate-800 transition active:translate-y-0.5"
+                          >
+                            Reserve 🎟
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Pending Requests Alert */}
             {collabRequests.filter(r => r.status === 'pending').length > 0 && (
@@ -1041,7 +1161,7 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Milestone 2.3: OpenStreetMap Live Route & Transit Split */}
+                {/* OpenStreetMap Live Route & Transit Split */}
                 <div className="mt-5 pt-4 border-t-2 border-dashed border-slate-200 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
@@ -1443,6 +1563,44 @@ export default function App() {
               </div>
             </div>
 
+            {/* Active Cafe Passes / Bookings */}
+            <div className="pt-2 border-t-2 border-slate-100 space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <Ticket className="w-4 h-4 text-[#FF6B6B]" /> My Cafe Passes ({userBookings.length})
+                </span>
+              </div>
+
+              {userBookings.length === 0 ? (
+                <p className="text-[11px] font-medium text-slate-400 italic">No reserved cafe passes yet. Claim student discounts on the Home feed!</p>
+              ) : (
+                <div className="space-y-2">
+                  {userBookings.map((b) => (
+                    <div 
+                      key={b.id} 
+                      onClick={() => setConfirmedBookingPass(b)}
+                      className="p-3 bg-emerald-50 border-2 border-slate-900 rounded-xl flex items-center justify-between shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-emerald-100/70 transition"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-black text-slate-900">{b.cafe_name}</h4>
+                          <span className="text-[9px] font-black px-1.5 py-0.2 bg-emerald-200 border border-slate-900 rounded">
+                            {b.pass_code}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-600 font-bold mt-0.5">
+                          {b.booking_date} • {b.booking_time} • {b.party_size} Guests
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">
+                        View Pass →
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Campus Friends & Incoming Requests */}
             <div className="pt-2 border-t-2 border-slate-100 space-y-3">
               <div className="flex justify-between items-center">
@@ -1552,6 +1710,151 @@ export default function App() {
 
       </main>
 
+      {/* ==================== MODALS ==================== */}
+
+      {/* Milestone 3.1: Reserve Table / Spot Modal */}
+      {selectedCafeForBooking && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-slate-900 rounded-2xl p-5 max-w-sm w-full shadow-[6px_6px_0px_#000] space-y-4">
+            <div className="flex justify-between items-center border-b-2 border-slate-100 pb-2">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 uppercase">Reserve Table Slot</h3>
+                <p className="text-[10px] text-slate-500 font-bold">{selectedCafeForBooking.name}</p>
+              </div>
+              <button onClick={() => setSelectedCafeForBooking(null)}>
+                <X className="w-5 h-5 text-slate-500 hover:text-slate-800" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border-2 border-slate-900 rounded-xl space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-black text-slate-900">{selectedCafeForBooking.discount_text}</span>
+                <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-slate-900 px-1.5 py-0.5 rounded">
+                  Free Student Booking
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-600 font-bold">📍 {selectedCafeForBooking.landmark} • Min Spend ~₹{selectedCafeForBooking.min_spend}</p>
+            </div>
+
+            <form onSubmit={handleCreateBooking} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Select Day</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {["Today", "Tomorrow"].map((d) => (
+                    <button
+                      type="button"
+                      key={d}
+                      onClick={() => setBookingDate(d)}
+                      className={`py-1.5 text-xs font-black rounded-xl border-2 border-slate-900 transition ${
+                        bookingDate === d ? 'bg-[#4D96FF] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Estimated Arrival Slot</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {["4:30 PM", "6:00 PM", "7:30 PM"].map((t) => (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => setBookingTime(t)}
+                      className={`py-1.5 text-[11px] font-black rounded-xl border-2 border-slate-900 transition ${
+                        bookingTime === t ? 'bg-[#6BCB77] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black text-slate-700 block mb-1">Party / Squad Size</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { label: "Solo (1)", val: 1 },
+                    { label: "Pair (2)", val: 2 },
+                    { label: "Squad (4)", val: 4 }
+                  ].map((p) => (
+                    <button
+                      type="button"
+                      key={p.val}
+                      onClick={() => setBookingPartySize(p.val)}
+                      className={`py-1.5 text-[11px] font-black rounded-xl border-2 border-slate-900 transition ${
+                        bookingPartySize === p.val ? 'bg-[#FFE66D] text-slate-900 shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={bookingLoading}
+                className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black uppercase tracking-wider rounded-xl shadow-[3px_3px_0px_#6BCB77] active:translate-y-0.5 transition"
+              >
+                {bookingLoading ? "Confirming Spot..." : "Claim Spot & Generate Pass"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Milestone 3.1: Digital Student Check-in Pass Card */}
+      {confirmedBookingPass && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-slate-900 rounded-3xl p-5 max-w-sm w-full shadow-[8px_8px_0px_#000] space-y-4 text-center animate-in fade-in zoom-in-95">
+            <div className="inline-flex p-3 bg-emerald-100 border-2 border-slate-900 rounded-full shadow-[2px_2px_0px_#000]">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+            </div>
+
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-900">
+                Official Check-In Pass
+              </span>
+              <h3 className="text-xl font-black text-slate-900 mt-2">{confirmedBookingPass.cafe_name}</h3>
+              <p className="text-xs font-bold text-slate-500">{confirmedBookingPass.booking_date} at {confirmedBookingPass.booking_time}</p>
+            </div>
+
+            <div className="p-4 bg-amber-100 border-2 border-dashed border-slate-900 rounded-2xl space-y-1">
+              <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider">Show this PIN to Staff</span>
+              <div className="text-3xl font-black tracking-widest text-slate-900">
+                {confirmedBookingPass.pass_code}
+              </div>
+              <p className="text-[10px] font-bold text-slate-600">Reserved for {confirmedBookingPass.party_size} students ({userProfile.name})</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Hey! Here is our MeetRa Booking Pass at ${confirmedBookingPass.cafe_name}: Code ${confirmedBookingPass.pass_code} (${confirmedBookingPass.booking_date} at ${confirmedBookingPass.booking_time}).`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 bg-[#25D366] hover:bg-emerald-500 text-white text-xs font-black rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 transition active:translate-y-0.5"
+              >
+                Share on WhatsApp
+              </a>
+
+              <button
+                onClick={() => {
+                  setConfirmedBookingPass(null);
+                  setSelectedCafeForBooking(null);
+                }}
+                className="py-2.5 bg-slate-900 text-white text-xs font-black rounded-xl border-2 border-slate-900 shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition"
+              >
+                Done ✓
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Inspecting Peer Modal */}
       {inspectingPeer && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -1650,7 +1953,6 @@ export default function App() {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-3">
-              {/* Photo */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-1">Profile Photo</label>
                 <div className="flex items-center gap-3 p-2 bg-slate-50 border-2 border-dashed border-slate-900 rounded-xl">
@@ -1668,7 +1970,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Name & Age */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
                   <label className="text-[11px] font-black text-slate-700 block mb-0.5">Full Name</label>
@@ -1690,7 +1991,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* College Dropdown */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">College / Campus</label>
                 <select
@@ -1702,7 +2002,6 @@ export default function App() {
                 </select>
               </div>
 
-              {/* Course & Year */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-black text-slate-700 block mb-0.5">Course</label>
@@ -1727,7 +2026,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Conditional Branch Dropdown for B.Tech */}
               {profileForm.course === 'B.Tech' && (
                 <div>
                   <label className="text-[11px] font-black text-slate-700 block mb-0.5">Engineering Branch</label>
@@ -1741,7 +2039,6 @@ export default function App() {
                 </div>
               )}
 
-              {/* Bio & Hobbies */}
               <div>
                 <label className="text-[11px] font-black text-slate-700 block mb-0.5">Short Bio (Optional)</label>
                 <textarea 
