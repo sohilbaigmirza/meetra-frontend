@@ -101,7 +101,7 @@ export default function App() {
   const [budget, setBudget] = useState(300);
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
-  const [mode, setMode] = useState('match');
+  const [mode, setMode] = useState('match'); // 'solo' | 'match' | 'group'
 
   // Dynamic Start Location & Coordinates State
   const [location, setLocation] = useState('MITS Main Gate');
@@ -330,10 +330,13 @@ export default function App() {
     }
   };
 
-  const fetchMessages = async (peerId) => {
-    if (!userProfile?.id || !peerId) return;
+  const fetchMessages = async (peerIdOrOutingId, isGroup = false) => {
+    if (!userProfile?.id || !peerIdOrOutingId) return;
     try {
-      const res = await fetch(`${API_BASE}/chat/thread/${userProfile.id}/${peerId}`);
+      const url = isGroup 
+        ? `${API_BASE}/chat/group/${peerIdOrOutingId}`
+        : `${API_BASE}/chat/thread/${userProfile.id}/${peerIdOrOutingId}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -354,18 +357,17 @@ export default function App() {
 
   useEffect(() => {
     if (activeChatCollab && activeTab === 'chat') {
-      const targetPeerId = activeChatCollab.peerId || (
-        activeChatCollab.sender_id === userProfile.id 
-          ? activeChatCollab.receiver_id 
-          : activeChatCollab.sender_id
-      );
+      const isGroup = !!activeChatCollab.isGroup;
+      const targetId = isGroup 
+        ? activeChatCollab.id 
+        : (activeChatCollab.peerId || (activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_id : activeChatCollab.sender_id));
 
-      fetchMessages(targetPeerId);
+      fetchMessages(targetId, isGroup);
       const interval = setInterval(() => {
         if (document.visibilityState === 'visible') {
-          fetchMessages(targetPeerId);
+          fetchMessages(targetId, isGroup);
         }
-      }, 5000);
+      }, 4000);
       return () => clearInterval(interval);
     }
   }, [activeChatCollab, activeTab, userProfile?.id]);
@@ -456,7 +458,7 @@ export default function App() {
         total_expense: plan.total_cost,
         expense_breakdown: { transit: 30, activities_and_food: plan.total_cost - 30 },
         tags: selectedInterests,
-        max_seats: 4,
+        max_seats: mode === 'group' ? 4 : 2,
         is_solo: mode === 'solo',
         created_by: userProfile.name,
         created_by_id: userProfile.id
@@ -483,15 +485,17 @@ export default function App() {
   const handleSendInvite = async (peer) => {
     if (!userProfile?.id) return;
 
-    const existing = collabRequests.find(
-      c => (c.sender_id === peer.id || c.receiver_id === peer.id) && c.status === 'accepted'
-    );
+    if (mode !== 'group') {
+      const existing = collabRequests.find(
+        c => (c.sender_id === peer.id || c.receiver_id === peer.id) && c.status === 'accepted'
+      );
 
-    if (existing) {
-      alert(`You are already connected with ${peer.name}! Opening chat.`);
-      setActiveChatCollab(existing);
-      setActiveTab('chat');
-      return;
+      if (existing) {
+        alert(`You are already connected with ${peer.name}! Opening chat.`);
+        setActiveChatCollab(existing);
+        setActiveTab('chat');
+        return;
+      }
     }
 
     const activeOutingId = plan?.id || (savedOutings.length > 0 ? savedOutings[0].id : 1);
@@ -512,7 +516,7 @@ export default function App() {
       if (res.ok) {
         setInvitedPeers(prev => [...prev, peer.id]);
         await fetchCollabs(userProfile.id);
-        alert(`Invite sent to ${peer.name}!`);
+        alert(mode === 'group' ? `Added ${peer.name} to your squad!` : `Invite sent to ${peer.name}!`);
       }
     } catch (err) {
       console.error("Invite error:", err);
@@ -543,11 +547,10 @@ export default function App() {
     e.preventDefault();
     if (!newMessageText.trim() || !activeChatCollab || !userProfile) return;
 
-    const targetPeerId = activeChatCollab.peerId || (
-      activeChatCollab.sender_id === userProfile.id 
-        ? activeChatCollab.receiver_id 
-        : activeChatCollab.sender_id
-    );
+    const isGroup = !!activeChatCollab.isGroup;
+    const targetPeerId = isGroup 
+      ? null 
+      : (activeChatCollab.peerId || (activeChatCollab.sender_id === userProfile.id ? activeChatCollab.receiver_id : activeChatCollab.sender_id));
 
     const optimisticMsg = {
       id: Date.now(),
@@ -577,7 +580,7 @@ export default function App() {
       });
 
       if (!res.ok) {
-        fetchMessages(targetPeerId);
+        fetchMessages(isGroup ? activeChatCollab.id : targetPeerId, isGroup);
       }
     } catch (err) {
       console.error("Message send error:", err);
@@ -640,23 +643,23 @@ export default function App() {
 
         if (res.ok) {
           const data = await res.json();
-          const dbUser = data.user;
+          const dbUser = data.user || data;
           setUserProfile(dbUser);
           localStorage.setItem('meetra_user', JSON.stringify(dbUser));
           
           setProfileForm({
-            name: dbUser.name || '',
+            name: dbUser.name || user.displayName || '',
             age: dbUser.age || 19,
-            college: dbUser.college || 'ITM University',
+            college: dbUser.college && dbUser.college !== "Campus Member" ? dbUser.college : 'ITM University',
             course: 'B.Tech',
             branchName: 'CSE',
             year: '1st Year',
             bio: dbUser.bio || 'Up for quick cafe hangouts & street food trails!',
-            avatar_url: dbUser.avatar_url || null,
+            avatar_url: dbUser.avatar_url || user.photoURL || null,
             interests: dbUser.interests || ['Food', 'Cafes']
           });
 
-          if (data.is_new_user) {
+          if (data.is_new_user || !dbUser.college || dbUser.college === "Campus Member") {
             setIsEditingProfile(true);
           }
         } else {
@@ -960,24 +963,33 @@ export default function App() {
                 </div>
               </div>
 
+              {/* 3-Way Outing Preference Switcher */}
               <div>
                 <label className="text-xs font-black text-slate-800 block mb-1.5">Outing Preference</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   <button
                     type="button" onClick={() => setMode('solo')}
-                    className={`py-2 text-xs font-black rounded-xl border-2 border-slate-900 transition ${
+                    className={`py-2 text-[11px] font-black rounded-xl border-2 border-slate-900 transition ${
                       mode === 'solo' ? 'bg-[#4D96FF] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
                     }`}
                   >
-                    Go Solo
+                    🚶‍♂️ Go Solo
                   </button>
                   <button
                     type="button" onClick={() => setMode('match')}
-                    className={`py-2 text-xs font-black rounded-xl border-2 border-slate-900 transition ${
+                    className={`py-2 text-[11px] font-black rounded-xl border-2 border-slate-900 transition ${
                       mode === 'match' ? 'bg-[#6BCB77] text-white shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
                     }`}
                   >
-                    Find a Match
+                    🤝 1-on-1 Match
+                  </button>
+                  <button
+                    type="button" onClick={() => setMode('group')}
+                    className={`py-2 text-[11px] font-black rounded-xl border-2 border-slate-900 transition ${
+                      mode === 'group' ? 'bg-[#FFE66D] text-slate-900 shadow-[2px_2px_0px_#000]' : 'bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    👥 Group (3-4)
                   </button>
                 </div>
               </div>
@@ -1001,7 +1013,7 @@ export default function App() {
                 <div className="flex justify-between items-start border-b-2 border-slate-100 pb-3">
                   <div>
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-emerald-100 border border-slate-900 rounded-md">
-                      {mode === 'solo' ? 'Solo Itinerary' : 'Matched Itinerary'}
+                      {mode === 'solo' ? 'Solo Itinerary' : mode === 'group' ? '👥 Group Squad (3-4)' : 'Matched Itinerary'}
                     </span>
                     <h3 className="text-lg font-black text-slate-900 mt-1">{plan.title}</h3>
                   </div>
@@ -1082,11 +1094,32 @@ export default function App() {
                   </div>
                 </div>
 
-                {mode === 'match' && plan.potential_peers && (
+                {/* Peer List: 1-on-1 vs Group Squad Assembly */}
+                {(mode === 'match' || mode === 'group') && plan.potential_peers && (
                   <div className="mt-6 pt-5 border-t-2 border-dashed border-slate-200">
-                    <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5 mb-3">
-                      <Users className="w-4 h-4 text-[#FF6B6B]" /> Compatible Peers ({plan.match_score}%)
-                    </span>
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
+                        <Users className="w-4 h-4 text-[#FF6B6B]" /> 
+                        {mode === 'group' ? `Assemble Squad (${invitedPeers.length + 1}/4 Members)` : `Compatible Peers (${plan.match_score}%)`}
+                      </span>
+                      {mode === 'group' && invitedPeers.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setActiveChatCollab({
+                              id: plan.id || 999,
+                              isGroup: true,
+                              groupName: `${plan.title} Squad`,
+                              membersCount: invitedPeers.length + 1
+                            });
+                            setActiveTab('chat');
+                          }}
+                          className="px-2.5 py-1 text-[10px] font-black bg-[#FFE66D] hover:bg-amber-300 text-slate-900 rounded-lg border border-slate-900 shadow-[1px_1px_0px_#000]"
+                        >
+                          💬 Open Squad Chat ({invitedPeers.length + 1})
+                        </button>
+                      )}
+                    </div>
+
                     <div className="space-y-2">
                       {plan.potential_peers.map((peer) => {
                         const isInvited = invitedPeers.includes(peer.id) || collabRequests.some(c => c.receiver_id === peer.id);
@@ -1114,7 +1147,7 @@ export default function App() {
                                 isInvited ? 'bg-emerald-500 text-white' : 'bg-[#FF6B6B] text-white shadow-[2px_2px_0px_#000]'
                               }`}
                             >
-                              {isInvited ? "Invited ✓" : "Invite"}
+                              {isInvited ? "Added ✓" : mode === 'group' ? "+ Add to Squad" : "Invite"}
                             </button>
                           </div>
                         );
@@ -1162,13 +1195,22 @@ export default function App() {
                         <ArrowLeft className="w-4 h-4 text-slate-900" />
                       </button>
                       <div>
-                        <h4 className="text-xs font-black text-slate-900">
-                          {activeChatCollab.sender_id === userProfile.id 
-                            ? activeChatCollab.receiver_name 
-                            : activeChatCollab.sender_name}
+                        <h4 className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                          {activeChatCollab.isGroup ? (
+                            <>
+                              <Users className="w-3.5 h-3.5 text-[#FF6B6B]" />
+                              {activeChatCollab.groupName}
+                            </>
+                          ) : (
+                            activeChatCollab.sender_id === userProfile.id 
+                              ? activeChatCollab.receiver_name 
+                              : activeChatCollab.sender_name
+                          )}
                         </h4>
                         <p className="text-[10px] text-slate-600 font-bold">
-                          Collab #{activeChatCollab.id} • Match: {activeChatCollab.match_percentage}%
+                          {activeChatCollab.isGroup 
+                            ? `${activeChatCollab.membersCount} Squad Members` 
+                            : `Collab #${activeChatCollab.id} • Match: ${activeChatCollab.match_percentage}%`}
                         </p>
                       </div>
                     </div>
@@ -1189,7 +1231,7 @@ export default function App() {
                         {location.includes("Gate") ? "Campus Tapri Point" : `Midway near ${location}`}
                       </span>
                       <span className="text-emerald-700 font-black ml-1.5">
-                        (₹{Math.round((plan?.total_cost || 300) / 2)} / student)
+                        (₹{Math.round((plan?.total_cost || 300) / (activeChatCollab.isGroup ? activeChatCollab.membersCount || 3 : 2))} / student)
                       </span>
                     </div>
 
@@ -1197,7 +1239,8 @@ export default function App() {
                       <button
                         type="button"
                         onClick={async () => {
-                          const splitText = `📍 Meetup point: ${location.includes("Gate") ? "Campus Tapri Point" : location}. Estimated transit split: ₹${Math.round((plan?.total_cost || 300) / 2)} per head. Ready?`;
+                          const splitPrice = Math.round((plan?.total_cost || 300) / (activeChatCollab.isGroup ? activeChatCollab.membersCount || 3 : 2));
+                          const splitText = `📍 Meetup point: ${location.includes("Gate") ? "Campus Tapri Point" : location}. Estimated transit split: ₹${splitPrice} per head. Ready?`;
                           setNewMessageText(splitText);
                         }}
                         className="px-2 py-1 bg-amber-200 hover:bg-amber-300 text-slate-900 text-[10px] font-black rounded-lg border border-slate-900 transition"
@@ -1268,7 +1311,7 @@ export default function App() {
                     <h3 className="text-sm font-black uppercase tracking-wide text-slate-900 flex items-center gap-2">
                       <MessageSquare className="w-4 h-4 text-[#4D96FF]" /> Active Conversations
                     </h3>
-                    <p className="text-[11px] font-bold text-slate-500">Pick a peer to coordinate your outing</p>
+                    <p className="text-[11px] font-bold text-slate-500">Pick a peer or squad to coordinate</p>
                   </div>
                   <span className="text-xs font-black bg-blue-100 border border-slate-900 px-2 py-0.5 rounded-md">
                     {collabRequests.filter(c => c.status === 'accepted').length} Active
