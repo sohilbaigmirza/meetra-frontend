@@ -645,8 +645,7 @@ export default function App() {
     }
   };
 
-  // ---------------- RENDER LANDING & LOGIN IF NOT LOGGED IN ---------------- //
-  // ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
+// ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
   if (!userProfile) {
     const handleGoogleSignIn = async () => {
       setAuthLoading(true);
@@ -654,7 +653,6 @@ export default function App() {
         const result = await signInWithPopup(auth, googleProvider);
         const user = result.user;
 
-        // Send verified Google user info to Neon backend
         const res = await fetch(`${API_BASE}/auth/google`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -671,11 +669,11 @@ export default function App() {
           setUserProfile(dbUser);
           localStorage.setItem('meetra_user', JSON.stringify(dbUser));
         } else {
-          alert("Could not sync account with server. Please try again.");
+          alert("Could not sync account with database. Please try again.");
         }
       } catch (err) {
         console.error("Google Auth error:", err);
-        alert("Google Sign-In was cancelled or encountered an error.");
+        alert("Google Sign-In was cancelled or failed.");
       } finally {
         setAuthLoading(false);
       }
@@ -685,7 +683,6 @@ export default function App() {
       <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-center px-6 max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
         <div className="space-y-6">
           
-          {/* Brand Header */}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-2 bg-white border-2 border-slate-900 px-3 py-1 rounded-full shadow-[2px_2px_0px_#000]">
               <Sparkles className="w-4 h-4 text-[#FF6B6B]" />
@@ -695,13 +692,12 @@ export default function App() {
             <p className="text-xs font-bold text-slate-600">Zero awkward plans. Spontaneous college outings.</p>
           </div>
 
-          {/* Clean Google One-Tap Card */}
           <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-5">
             <div>
               <span className="text-xs font-black uppercase text-slate-800">Student Sign In</span>
               <h3 className="text-lg font-black text-slate-900 mt-0.5">Continue with your college email</h3>
               <p className="text-[11px] text-slate-500 font-semibold mt-1">
-                No passwords or SMS delays. One click verifies your identity.
+                Zero SMS delays or passwords. Instant verification for campus outings.
               </p>
             </div>
 
@@ -710,14 +706,13 @@ export default function App() {
               disabled={authLoading}
               className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-3"
             >
-              {/* Google G Logo SVG */}
               <svg className="w-4 h-4" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
                 <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
                 <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
               </svg>
-              {authLoading ? "Signing in..." : "Continue with Google"}
+              {authLoading ? "Opening Google..." : "Continue with Google"}
             </button>
 
             <div className="p-2.5 bg-emerald-50 border border-slate-900 rounded-xl text-[10px] font-bold text-emerald-900 flex items-center gap-1.5">

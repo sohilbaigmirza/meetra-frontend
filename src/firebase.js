@@ -2,12 +2,12 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "YOUR_FIREBASE_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyDbfujBH8FIrY-G9LY1XSYxC_PQJhO2AZA",
+  authDomain: "meetra-app-5b43e.firebaseapp.com",
+  projectId: "meetra-app-5b43e",
+  storageBucket: "meetra-app-5b43e.firebasestorage.app",
+  messagingSenderId: "497337179014",
+  appId: "1:497337179014:web:efeb1f1bcaf2ee459baa07"
 };
 
 const app = initializeApp(firebaseConfig);
