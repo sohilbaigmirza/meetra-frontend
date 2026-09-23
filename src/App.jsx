@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, signInWithPopup } from './firebase';
 import RouteMap from './components/RouteMap';
+import { THEME } from './components/design/AppStyles';
+import { MeetraLogo, ScallopedBadge, OnboardingModal } from './components/design/BrandComponents';
 import { 
   Home as HomeIcon, 
   Compass, 
@@ -33,6 +35,9 @@ const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   
+  // Onboarding Carousel State (checks if user has seen preview)
+  const [showOnboarding, setShowOnboarding] = useState(() => !localStorage.getItem('meetra_onboarded'));
+
   // User Profile State
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('meetra_user');
@@ -115,7 +120,7 @@ export default function App() {
   const [budget, setBudget] = useState(300);
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
-  const [mode, setMode] = useState('match');
+  const [mode, setMode] = useState('match'); // 'solo' | 'match' | 'group'
 
   // Dynamic Start Location & Coordinates State
   const [location, setLocation] = useState('MITS Main Gate');
@@ -699,7 +704,7 @@ export default function App() {
     }
   };
 
-  // ---------------- RENDER GOOGLE SIGN-IN IF NOT LOGGED IN ---------------- //
+  // ---------------- RENDER AUTH SCREEN IF NOT LOGGED IN ---------------- //
   if (!userProfile) {
     const handleGoogleSignIn = async () => {
       setAuthLoading(true);
@@ -751,45 +756,66 @@ export default function App() {
     };
 
     return (
-      <div className="min-h-screen bg-[#FDFBF7] text-slate-900 flex flex-col justify-center px-6 max-w-md mx-auto border-x-2 border-slate-900 shadow-2xl relative">
-        <div className="space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center gap-2 bg-white border-2 border-slate-900 px-3 py-1 rounded-full shadow-[2px_2px_0px_#000]">
-              <Sparkles className="w-4 h-4 text-[#FF6B6B]" />
-              <span className="text-xs font-black tracking-wider uppercase">Campus Outings</span>
-            </div>
-            <h1 className="text-4xl font-black text-slate-900 tracking-tight">MeetRa</h1>
-            <p className="text-xs font-bold text-slate-600">Zero awkward plans. Spontaneous college outings.</p>
+      <div className="min-h-screen bg-[#F4F7FC] text-slate-900 flex flex-col justify-between px-6 py-10 max-w-md mx-auto relative overflow-hidden">
+        {/* Onboarding 3-step carousel modal */}
+        {showOnboarding && (
+          <OnboardingModal onComplete={() => {
+            setShowOnboarding(false);
+            localStorage.setItem('meetra_onboarded', 'true');
+          }} />
+        )}
+
+        {/* Ambient Soft Blobs */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#E2EDFB] rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+        <div className="absolute bottom-10 left-0 w-64 h-64 bg-[#FDEEE9] rounded-full blur-3xl pointer-events-none -ml-16" />
+
+        {/* App Logo & Header */}
+        <div className="relative z-10 flex flex-col items-center text-center mt-6 space-y-3">
+          <div className="w-24 h-24 bg-white rounded-3xl p-3 shadow-[0_12px_32px_rgba(34,66,125,0.08)] flex items-center justify-center">
+            <MeetraLogo className="w-20 h-20" />
+          </div>
+          <h1 className="text-3xl font-black text-[#22427D] tracking-tight">MeetRa</h1>
+          <p className="text-xs text-slate-500 font-medium max-w-xs">
+            Find travelers whose plans already overlap with yours.
+          </p>
+        </div>
+
+        {/* Welcome Aboard Card matching Screen 3 */}
+        <div className="relative z-10 bg-white rounded-[32px] p-6 shadow-[0_16px_40px_rgba(34,66,125,0.08)] space-y-4 my-auto border border-slate-50 text-left">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Welcome aboard</h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Connect your verified Google account to discover overlapping outings.
+            </p>
           </div>
 
-          <div className="bg-white border-2 border-slate-900 rounded-2xl p-6 shadow-[4px_4px_0px_#000] space-y-5">
-            <div>
-              <span className="text-xs font-black uppercase text-slate-800">Student Sign In</span>
-              <h3 className="text-lg font-black text-slate-900 mt-0.5">Continue with your college email</h3>
-              <p className="text-[11px] text-slate-500 font-semibold mt-1">
-                Zero SMS delays or passwords. Instant verification for campus outings.
-              </p>
-            </div>
+          <button 
+            onClick={handleGoogleSignIn}
+            disabled={authLoading}
+            className={THEME.buttons.primaryRounded}
+          >
+            <svg className="w-4 h-4 bg-white rounded-full p-0.5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
+              <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
+            </svg>
+            <span>{authLoading ? "Opening Google..." : "Continue with Google"}</span>
+          </button>
 
-            <button 
-              onClick={handleGoogleSignIn}
-              disabled={authLoading}
-              className="w-full py-3 bg-white hover:bg-slate-50 text-slate-900 font-black text-xs uppercase tracking-wider rounded-xl border-2 border-slate-900 shadow-[3px_3px_0px_#000] active:translate-y-0.5 transition flex items-center justify-center gap-3"
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24Z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15Z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"/>
-              </svg>
-              {authLoading ? "Opening Google..." : "Continue with Google"}
-            </button>
+          <p className="text-[10px] text-slate-400 text-center font-medium">
+            By continuing you agree to our Terms and Privacy Policy.
+          </p>
+        </div>
 
-            <div className="p-2.5 bg-emerald-50 border border-slate-900 rounded-xl text-[10px] font-bold text-emerald-900 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Verified accounts get an automatic 5.0 Trust Badge.</span>
-            </div>
-          </div>
+        {/* Footer trigger to re-open the carousel */}
+        <div className="text-center">
+          <button 
+            onClick={() => setShowOnboarding(true)} 
+            className="text-xs font-bold text-[#22427D] hover:underline"
+          >
+            Review App Onboarding Preview
+          </button>
         </div>
       </div>
     );
