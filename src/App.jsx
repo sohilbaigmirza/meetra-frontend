@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, signInWithPopup } from './firebase';
 import RouteMap from './components/RouteMap';
 import { THEME } from './components/design/AppStyles';
-import { MeetraLogo, ScallopedBadge, FloatingNavBar } from './components/design/BrandComponents';
+import { MeetraLogo, ScallopedBadge, FloatingNavBar } from './components/design/BrandIcons';
 import { 
   Sparkles, 
   Users, 
