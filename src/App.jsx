@@ -330,10 +330,10 @@ export default function App() {
     }
   };
 
-  const fetchMessages = async (collabId) => {
-    if (!collabId) return;
+  const fetchMessages = async (peerId) => {
+    if (!userProfile?.id || !peerId) return;
     try {
-      const res = await fetch(`${API_BASE}/chat/${collabId}`);
+      const res = await fetch(`${API_BASE}/chat/thread/${userProfile.id}/${peerId}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -354,15 +354,21 @@ export default function App() {
 
   useEffect(() => {
     if (activeChatCollab && activeTab === 'chat') {
-      fetchMessages(activeChatCollab.id);
+      const targetPeerId = activeChatCollab.peerId || (
+        activeChatCollab.sender_id === userProfile.id 
+          ? activeChatCollab.receiver_id 
+          : activeChatCollab.sender_id
+      );
+
+      fetchMessages(targetPeerId);
       const interval = setInterval(() => {
         if (document.visibilityState === 'visible') {
-          fetchMessages(activeChatCollab.id);
+          fetchMessages(targetPeerId);
         }
-      }, 8000);
+      }, 5000);
       return () => clearInterval(interval);
     }
-  }, [activeChatCollab, activeTab]);
+  }, [activeChatCollab, activeTab, userProfile?.id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -537,10 +543,17 @@ export default function App() {
     e.preventDefault();
     if (!newMessageText.trim() || !activeChatCollab || !userProfile) return;
 
+    const targetPeerId = activeChatCollab.peerId || (
+      activeChatCollab.sender_id === userProfile.id 
+        ? activeChatCollab.receiver_id 
+        : activeChatCollab.sender_id
+    );
+
     const optimisticMsg = {
       id: Date.now(),
       collab_id: activeChatCollab.id,
       sender_id: userProfile.id,
+      receiver_id: targetPeerId,
       sender_name: userProfile.name,
       text: newMessageText.trim(),
       created_at: new Date().toISOString()
@@ -557,13 +570,14 @@ export default function App() {
         body: JSON.stringify({
           collab_id: activeChatCollab.id,
           sender_id: userProfile.id,
+          receiver_id: targetPeerId,
           sender_name: userProfile.name,
           text: textToSend
         })
       });
 
       if (!res.ok) {
-        fetchMessages(activeChatCollab.id);
+        fetchMessages(targetPeerId);
       }
     } catch (err) {
       console.error("Message send error:", err);
