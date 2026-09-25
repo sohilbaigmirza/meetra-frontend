@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { auth, googleProvider, signInWithPopup } from './firebase';
 import RouteMap from './components/RouteMap';
-import { THEME } from './components/design/AppStyles';
-import { MeetraLogo, ScallopedBadge, FloatingNavBar } from './components/design/BrandIcons';
+import { MeetraLogo, ScallopedBadge } from './components/design/BrandIcons';
 import { 
+  Home as HomeIcon, 
+  Compass, 
+  MessageSquare, 
+  User as UserIcon, 
   Sparkles, 
   Users, 
   ArrowRight, 
@@ -23,16 +26,16 @@ import {
   Tag,
   Ticket,
   Calendar,
+  PhoneCall,
   Search,
-  MapPin,
-  Edit2
+  MapPin
 } from 'lucide-react';
 
 const API_BASE = "https://meetra-backend-vjuy.onrender.com/api/v1";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
-
+  
   // User Profile State
   const [userProfile, setUserProfile] = useState(() => {
     const saved = localStorage.getItem('meetra_user');
@@ -47,7 +50,7 @@ export default function App() {
   const [bookmarkedOutingIds, setBookmarkedOutingIds] = useState([]);
   const [savedWishlistOutings, setSavedWishlistOutings] = useState([]);
 
-  // Partner Cafes & Spot Pre-Bookings State
+  // Milestone 3.1: Partner Cafes & Spot Pre-Bookings State
   const [partnerCafes, setPartnerCafes] = useState([]);
   const [userBookings, setUserBookings] = useState([]);
   const [selectedCafeForBooking, setSelectedCafeForBooking] = useState(null);
@@ -115,7 +118,7 @@ export default function App() {
   const [budget, setBudget] = useState(300);
   const [selectedInterests, setSelectedInterests] = useState(['Food', 'Cafes']);
   const [outingType, setOutingType] = useState('Casual Hangout');
-  const [mode, setMode] = useState('match'); // 'solo' | 'match' | 'group'
+  const [mode, setMode] = useState('match');
 
   // Dynamic Start Location & Coordinates State
   const [location, setLocation] = useState('MITS Main Gate');
@@ -699,7 +702,7 @@ export default function App() {
     }
   };
 
-  // ---------------- RENDER CLEAN AUTH SCREEN IF NOT LOGGED IN ---------------- //
+  // ---------------- DESIGNER-THEMED LOGIN SCREEN ---------------- //
   if (!userProfile) {
     const handleGoogleSignIn = async () => {
       setAuthLoading(true);
@@ -751,12 +754,12 @@ export default function App() {
     };
 
     return (
-      <div className={THEME.classes.screenContainer + " justify-between px-6 py-12"}>
-        {/* Ambient Soft Pastel Blobs */}
+      <div className="min-h-screen bg-[#F6F9FD] text-[#0F172A] flex flex-col justify-between px-6 py-12 max-w-md mx-auto relative overflow-hidden shadow-2xl">
+        {/* Ambient Soft Blobs */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#E2EDFB] rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
         <div className="absolute bottom-10 left-0 w-64 h-64 bg-[#FDEEE9] rounded-full blur-3xl pointer-events-none -ml-16" />
 
-        {/* Brand Splash Top (Screen 1) */}
+        {/* Brand Splash (Mockup 1 & 3) */}
         <div className="relative z-10 flex flex-col items-center text-center mt-6 space-y-3">
           <div className="w-24 h-24 bg-white rounded-3xl p-3 shadow-[0_12px_32px_rgba(34,66,125,0.08)] flex items-center justify-center">
             <MeetraLogo className="w-20 h-20" />
@@ -767,8 +770,8 @@ export default function App() {
           </p>
         </div>
 
-        {/* Welcome Aboard Card (Screen 3) */}
-        <div className={THEME.classes.whiteCard + " relative z-10 p-6 space-y-4 my-auto text-left"}>
+        {/* Welcome Aboard Card (Mockup 3) */}
+        <div className="relative z-10 bg-white rounded-[32px] p-6 shadow-[0_16px_40px_rgba(34,66,125,0.06)] border border-slate-100/80 space-y-4 my-auto text-left">
           <div>
             <h2 className="text-xl font-black text-slate-900">Welcome aboard</h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
@@ -779,7 +782,7 @@ export default function App() {
           <button 
             onClick={handleGoogleSignIn}
             disabled={authLoading}
-            className={THEME.classes.btnPrimary}
+            className="w-full py-3.5 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-[0_6px_16px_rgba(34,66,125,0.2)] transition active:scale-[0.98] flex items-center justify-center gap-3"
           >
             <svg className="w-4 h-4 bg-white rounded-full p-0.5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"/>
@@ -802,12 +805,12 @@ export default function App() {
     );
   }
 
-  // ---------------- MAIN APPLICATION (MATCHING SCREEN 4) ---------------- //
+  // ---------------- MAIN APPLICATION (MATCHING MOCKUP 4) ---------------- //
   return (
-    <div className={THEME.classes.screenContainer}>
+    <div className="min-h-screen bg-[#F6F9FD] text-[#0F172A] flex flex-col justify-between max-w-md mx-auto relative overflow-x-hidden shadow-2xl">
       
-      {/* Top Header Pill Bar (Screen 4) */}
-      <header className="sticky top-0 bg-white/90 backdrop-blur-md z-30 px-5 pt-3 pb-2 flex justify-between items-center border-b border-slate-100">
+      {/* Top Search & Header Bar (Mockup 4) */}
+      <header className="sticky top-0 bg-white/90 backdrop-blur-md z-30 px-5 pt-3 pb-2.5 flex justify-between items-center border-b border-slate-100 shadow-[0_2px_12px_rgba(34,66,125,0.03)]">
         <div className="flex-1 pr-3">
           <div className="relative">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -816,7 +819,7 @@ export default function App() {
               placeholder="Search destinations or campus spots"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-[#EEF4FD] rounded-full text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none"
+              className="w-full pl-9 pr-4 py-2 bg-[#EEF4FD] rounded-full text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#22427D]/30 transition"
             />
           </div>
         </div>
@@ -836,8 +839,8 @@ export default function App() {
         {activeTab === 'home' && (
           <div className="space-y-4">
 
-            {/* Plan a Trip Hero Card (Screen 4) */}
-            <div className={THEME.classes.heroCard}>
+            {/* Plan a Trip Hero Card (Mockup 4) */}
+            <div className="bg-[#EEF4FD] rounded-[32px] p-5 shadow-[0_8px_24px_rgba(34,66,125,0.06)] border border-blue-50/70 space-y-4 text-left">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-lg font-black text-slate-900 tracking-tight">Plan a trip</h3>
@@ -846,7 +849,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleDetectGPS}
-                  className="p-2 bg-white rounded-xl text-[#22427D] shadow-sm text-[10px] font-black flex items-center gap-1"
+                  className="px-2.5 py-1.5 bg-white rounded-xl text-[#22427D] shadow-sm text-[10px] font-black flex items-center gap-1 active:scale-95 transition"
                 >
                   <MapPin className="w-3.5 h-3.5" />
                   <span>{locating ? "GPS..." : "Detect"}</span>
@@ -855,7 +858,7 @@ export default function App() {
 
               <div className="space-y-2">
                 {/* Destination Pill */}
-                <div className={THEME.classes.pillInput}>
+                <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-50 text-[#22427D] rounded-xl"><MapPin className="w-4 h-4" /></div>
                     <div>
@@ -868,7 +871,7 @@ export default function App() {
                       />
                     </div>
                   </div>
-                  <Edit2 className="w-3.5 h-3.5 text-slate-300" />
+                  <Edit3 className="w-3.5 h-3.5 text-slate-300" />
                 </div>
 
                 {/* Hub Shortcuts */}
@@ -881,7 +884,7 @@ export default function App() {
                         setLocation(hub.name);
                         setStartCoords(hub.coords);
                       }}
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap transition ${
+                      className={`text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap transition ${
                         location === hub.name ? 'bg-[#22427D] text-white shadow-sm' : 'bg-white text-slate-600'
                       }`}
                     >
@@ -892,14 +895,14 @@ export default function App() {
 
                 {/* Depart & Return / Time Pills */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-white rounded-2xl p-2.5 shadow-sm flex items-center gap-2">
+                  <div className="bg-white rounded-2xl p-2.5 shadow-sm border border-slate-100 flex items-center gap-2">
                     <Calendar className="w-3.5 h-3.5 text-slate-400" />
                     <div>
                       <p className="text-[9px] uppercase font-bold text-slate-400">Depart</p>
                       <p className="text-xs font-black text-slate-900">Today</p>
                     </div>
                   </div>
-                  <div className="bg-white rounded-2xl p-2.5 shadow-sm flex items-center justify-between">
+                  <div className="bg-white rounded-2xl p-2.5 shadow-sm border border-slate-100 flex items-center justify-between">
                     <div>
                       <p className="text-[9px] uppercase font-bold text-slate-400">Time</p>
                       <p className="text-xs font-black text-slate-900">{hours} Hours</p>
@@ -912,7 +915,7 @@ export default function App() {
                 </div>
 
                 {/* Budget Slider */}
-                <div className="bg-white rounded-2xl p-3 shadow-sm space-y-1.5">
+                <div className="bg-white rounded-2xl p-3 shadow-sm border border-slate-100 space-y-1.5">
                   <div className="flex justify-between items-center text-xs font-black text-slate-800">
                     <span className="text-slate-400 font-bold">Pocket Budget</span>
                     <span className="text-sm font-black text-[#22427D]">₹{budget}</span>
@@ -955,14 +958,14 @@ export default function App() {
 
               <button
                 disabled={loading} onClick={handleGeneratePlan}
-                className={THEME.classes.btnPrimary}
+                className="w-full py-3.5 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-[0_6px_16px_rgba(34,66,125,0.2)] transition active:scale-[0.98] flex items-center justify-center gap-2"
               >
                 <span>{loading ? "Matching Overlaps..." : "Find My Match"}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Suggested Matches Section (Screen 4) */}
+            {/* Suggested Matches Section (Mockup 4) */}
             <div className="space-y-3 text-left">
               <div className="flex justify-between items-center px-1">
                 <h4 className="text-sm font-black text-slate-900">Suggested matches</h4>
@@ -1000,7 +1003,7 @@ export default function App() {
 
             {/* Partner Cafes & Discounts Carousel (Milestone 3.1) */}
             {partnerCafes.length > 0 && (
-              <div className={THEME.classes.whiteCard + " space-y-3"}>
+              <div className="bg-white rounded-[26px] p-4 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                     <Tag className="w-4 h-4 text-[#E8615A]" /> Partner Discounts & Cafes
@@ -1069,7 +1072,7 @@ export default function App() {
             )}
 
             {/* Outings Feed with Discovery Filters & Wishlist */}
-            <div className={THEME.classes.whiteCard + " space-y-3"}>
+            <div className="bg-white rounded-[26px] p-4 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Community Feed ({savedOutings.length})
@@ -1102,7 +1105,7 @@ export default function App() {
                       <button
                         key={b}
                         onClick={() => setActiveFeedBudget(b)}
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-black transition ${
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition ${
                           activeFeedBudget === b ? 'bg-[#22427D] text-white' : 'bg-slate-50 text-slate-600'
                         }`}
                       >
@@ -1150,10 +1153,10 @@ export default function App() {
         {activeTab === 'outing' && (
           <div className="space-y-4">
             {plan ? (
-              <div className={THEME.classes.whiteCard + " space-y-4 text-left"}>
+              <div className="bg-white rounded-[26px] p-5 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 space-y-4 text-left">
                 <div className="flex justify-between items-start border-b border-slate-100 pb-3">
                   <div>
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-blue-50 text-[#22427D] rounded-full">
+                    <span className="text-[10px] font-black uppercase px-2.5 py-0.5 bg-blue-50 text-[#22427D] rounded-full">
                       {mode === 'solo' ? 'Solo Itinerary' : mode === 'group' ? 'Group Squad (3-4)' : 'Matched Itinerary'}
                     </span>
                     <h3 className="text-base font-black text-slate-900 mt-1">{plan.title}</h3>
@@ -1188,7 +1191,7 @@ export default function App() {
                     <span className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
                       <Navigation className="w-4 h-4 text-[#22427D]" /> Live Route & Transit Split
                     </span>
-                    <span className="text-[9px] font-bold px-2 py-0.5 bg-blue-50 text-[#22427D] rounded-full">
+                    <span className="text-[9px] font-bold px-2.5 py-0.5 bg-blue-50 text-[#22427D] rounded-full">
                       OSM Real Roads
                     </span>
                   </div>
@@ -1248,17 +1251,17 @@ export default function App() {
 
                 <button
                   disabled={saving} onClick={handleConfirmAndSave}
-                  className={THEME.classes.btnPrimary}
+                  className="w-full py-3.5 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-[0_6px_16px_rgba(34,66,125,0.2)] transition active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   {saving ? "Saving to Database..." : "Lock & Confirm Outing"}
                   <Check className="w-4 h-4" />
                 </button>
               </div>
             ) : (
-              <div className={THEME.classes.whiteCard + " text-center py-16 space-y-3"}>
+              <div className="bg-white rounded-[26px] p-8 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 text-center py-16 space-y-3">
                 <Navigation className="w-10 h-10 text-slate-300 mx-auto" />
                 <h4 className="text-sm font-black text-slate-900">No Active Plan</h4>
-                <button onClick={() => setActiveTab('home')} className={THEME.classes.btnSecondary}>
+                <button onClick={() => setActiveTab('home')} className="px-4 py-2 bg-[#EEF4FD] hover:bg-blue-100 text-[#22427D] font-bold text-xs rounded-full transition active:scale-95">
                   Build Outing on Home
                 </button>
               </div>
@@ -1291,7 +1294,7 @@ export default function App() {
 
                   <button
                     onClick={() => setShowReviewModal(true)}
-                    className="text-[10px] font-black bg-[#22427D] text-white px-2.5 py-1 rounded-full shadow-sm"
+                    className="text-[10px] font-black bg-[#22427D] text-white px-3 py-1 rounded-full shadow-sm"
                   >
                     Finish & Rate ✓
                   </button>
@@ -1314,13 +1317,13 @@ export default function App() {
                   <div ref={chatBottomRef} />
                 </div>
 
-                <form onSubmit={handleSendMessage} className="p-2 bg-white border-t border-slate-100 flex gap-2">
+                <form onSubmit={handleSendMessage} className="p-2.5 bg-white border-t border-slate-100 flex gap-2">
                   <input 
                     type="text" 
                     placeholder="Type meetup details..."
                     value={newMessageText}
                     onChange={(e) => setNewMessageText(e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs bg-slate-50 rounded-full focus:outline-none"
+                    className="flex-1 px-4 py-2 text-xs bg-slate-50 rounded-full focus:outline-none focus:ring-1 focus:ring-[#22427D]/30"
                   />
                   <button 
                     type="submit"
@@ -1331,14 +1334,14 @@ export default function App() {
                 </form>
               </div>
             ) : (
-              <div className={THEME.classes.whiteCard + " space-y-4 text-left"}>
+              <div className="bg-white rounded-[26px] p-5 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 space-y-4 text-left">
                 <h3 className="text-sm font-black uppercase text-slate-900">Active Conversations</h3>
                 <div className="space-y-2">
                   {collabRequests.filter(c => c.status === 'accepted').map((convo) => (
                     <div 
                       key={convo.id}
                       onClick={() => setActiveChatCollab(convo)}
-                      className="p-3 bg-slate-50 hover:bg-blue-50 rounded-2xl flex items-center justify-between cursor-pointer transition"
+                      className="p-3 bg-slate-50 hover:bg-blue-50/80 rounded-2xl flex items-center justify-between cursor-pointer transition"
                     >
                       <div>
                         <h4 className="text-xs font-black text-slate-900">
@@ -1357,7 +1360,7 @@ export default function App() {
 
         {/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
-          <div className={THEME.classes.whiteCard + " space-y-4 text-left"}>
+          <div className="bg-white rounded-[26px] p-5 shadow-[0_6px_20px_rgba(34,66,125,0.05)] border border-slate-100/80 space-y-4 text-left">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-3">
                 <div className="w-14 h-14 rounded-2xl bg-[#EEF4FD] overflow-hidden flex items-center justify-center font-black text-sm text-[#22427D] shadow-sm">
@@ -1373,7 +1376,20 @@ export default function App() {
                 </div>
               </div>
               <button 
-                onClick={() => setIsEditingProfile(true)}
+                onClick={() => {
+                  setProfileForm({
+                    name: userProfile.name || '',
+                    age: userProfile.age || 19,
+                    college: userProfile.college || 'ITM University',
+                    course: 'B.Tech',
+                    branchName: 'CSE',
+                    year: '1st Year',
+                    bio: userProfile.bio || '',
+                    avatar_url: userProfile.avatar_url || null,
+                    interests: userProfile.interests || ['Food', 'Cafes']
+                  });
+                  setIsEditingProfile(true);
+                }}
                 className="p-2 rounded-xl bg-slate-50 hover:bg-blue-50 text-[#22427D]"
               >
                 <Edit3 className="w-4 h-4" />
@@ -1405,8 +1421,25 @@ export default function App() {
 
       </main>
 
-      {/* Floating Bottom Nav (Screen 4) */}
-      <FloatingNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Floating Bottom Nav (Mockup 4) */}
+      <nav className="fixed bottom-0 max-w-md w-full bg-white/95 backdrop-blur-md border-t border-slate-100 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0_-8px_24px_rgba(34,66,125,0.06)]">
+        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'home' ? 'text-[#22427D]' : 'text-slate-400'}`}>
+          <HomeIcon className="w-5 h-5" />
+          <span>Home</span>
+        </button>
+        <button onClick={() => setActiveTab('outing')} className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'outing' ? 'text-[#22427D]' : 'text-slate-400'}`}>
+          <Compass className="w-5 h-5" />
+          <span>Outing</span>
+        </button>
+        <button onClick={() => setActiveTab('chat')} className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'chat' ? 'text-[#22427D]' : 'text-slate-400'}`}>
+          <MessageSquare className="w-5 h-5" />
+          <span>Chat</span>
+        </button>
+        <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'profile' ? 'text-[#22427D]' : 'text-slate-400'}`}>
+          <UserIcon className="w-5 h-5" />
+          <span>Profile</span>
+        </button>
+      </nav>
 
       {/* Booking Pass Modal */}
       {confirmedBookingPass && (
@@ -1417,30 +1450,58 @@ export default function App() {
               <p className="text-[10px] uppercase font-bold text-slate-400">PIN to show staff</p>
               <div className="text-3xl font-black text-[#22427D] tracking-widest">{confirmedBookingPass.pass_code}</div>
             </div>
-            <button onClick={() => setConfirmedBookingPass(null)} className={THEME.classes.btnPrimary}>
+            <button onClick={() => setConfirmedBookingPass(null)} className="w-full py-3 bg-[#22427D] text-white text-xs font-black rounded-2xl">
               Done
             </button>
           </div>
         </div>
       )}
 
-      {/* Profile Customize Modal */}
+      {/* Profile Customize Modal (Full State Hook-in Intact) */}
       {isEditingProfile && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[32px] p-6 max-w-sm w-full space-y-4 text-left max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <h3 className="text-sm font-black text-slate-900 uppercase">Customize Profile</h3>
               <button onClick={() => setIsEditingProfile(false)}><X className="w-4 h-4 text-slate-400" /></button>
             </div>
             <form onSubmit={handleSaveProfile} className="space-y-3">
               <div>
-                <label className="text-[10px] uppercase font-bold text-slate-400">Full Name</label>
-                <input 
-                  type="text" required value={profileForm.name}
-                  onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl"
-                />
+                <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Profile Photo</label>
+                <div className="flex items-center gap-3 p-2 bg-[#EEF4FD] rounded-2xl">
+                  <div className="w-12 h-12 rounded-xl bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                    {profileForm.avatar_url ? (
+                      <img src={profileForm.avatar_url} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-black text-slate-500">DP</span>
+                    )}
+                  </div>
+                  <label className="px-3 py-1 bg-white text-slate-800 rounded-lg text-xs font-black cursor-pointer shadow-sm">
+                    Upload
+                    <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  </label>
+                </div>
               </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Full Name</label>
+                  <input 
+                    type="text" required value={profileForm.name}
+                    onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Age</label>
+                  <input 
+                    type="number" min="16" max="35" required value={profileForm.age || 19}
+                    onChange={(e) => setProfileForm({...profileForm, age: e.target.value})}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] uppercase font-bold text-slate-400">College</label>
                 <select
@@ -1451,7 +1512,178 @@ export default function App() {
                   {COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <button type="submit" className={THEME.classes.btnPrimary}>Save Profile</button>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Course</label>
+                  <select
+                    value={profileForm.course}
+                    onChange={(e) => setProfileForm({...profileForm, course: e.target.value})}
+                    className="w-full px-2.5 py-2 text-xs bg-slate-50 rounded-xl"
+                  >
+                    {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Year</label>
+                  <select
+                    value={profileForm.year}
+                    onChange={(e) => setProfileForm({...profileForm, year: e.target.value})}
+                    className="w-full px-2.5 py-2 text-xs bg-slate-50 rounded-xl"
+                  >
+                    {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {profileForm.course === 'B.Tech' && (
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-slate-400">Branch</label>
+                  <select
+                    value={profileForm.branchName}
+                    onChange={(e) => setProfileForm({...profileForm, branchName: e.target.value})}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl"
+                  >
+                    {BTECH_BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="text-[10px] uppercase font-bold text-slate-400">Bio</label>
+                <textarea 
+                  rows={2}
+                  value={profileForm.bio || ""}
+                  onChange={(e) => setProfileForm({...profileForm, bio: e.target.value})}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl resize-none"
+                />
+              </div>
+
+              <button type="submit" className="w-full py-3 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md">
+                Save Profile
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inspecting Peer Modal */}
+      {inspectingPeer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-sm w-full space-y-4 text-left shadow-xl animate-in fade-in zoom-in-95">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <span className="text-[10px] font-black uppercase tracking-wider bg-blue-50 text-[#22427D] px-2.5 py-0.5 rounded-full">
+                Verified Peer
+              </span>
+              <button onClick={() => setInspectingPeer(null)}><X className="w-4 h-4 text-slate-400" /></button>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-[#EEF4FD] overflow-hidden flex items-center justify-center text-lg font-black text-[#22427D] shrink-0">
+                {inspectingPeer.avatar_url ? (
+                  <img src={inspectingPeer.avatar_url} alt={inspectingPeer.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span>{inspectingPeer.name?.slice(0, 2).toUpperCase()}</span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">{inspectingPeer.name}</h3>
+                <p className="text-xs text-slate-400">{inspectingPeer.college || "Campus Member"}</p>
+                <div className="flex items-center gap-1 text-[11px] font-black text-amber-500 mt-0.5">
+                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                  <span>{inspectingPeer.rating || 5.0} Compatibility</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-[#EEF4FD] rounded-2xl text-xs text-slate-600 italic">
+              "{inspectingPeer.bio || 'Up for campus food walks and discovering budget cafes!'}"
+            </div>
+
+            {inspectingPeer.id !== userProfile.id && (
+              <button
+                onClick={() => handleSendFriendRequest(inspectingPeer)}
+                className="w-full py-2.5 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-sm transition"
+              >
+                + Connect as Campus Friend
+              </button>
+            )}
+
+            <button
+              onClick={() => setInspectingPeer(null)}
+              className="w-full py-2.5 bg-slate-100 text-slate-600 text-xs font-bold rounded-2xl"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] p-6 max-w-sm w-full space-y-4 text-left shadow-xl">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+              <h3 className="text-sm font-black text-slate-900 uppercase">Rate Collab Peer</h3>
+              <button onClick={() => setShowReviewModal(false)}><X className="w-4 h-4 text-slate-400" /></button>
+            </div>
+
+            <form onSubmit={handleSubmitReview} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1">Score Outing (1 to 5 Stars)</label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      type="button"
+                      key={star}
+                      onClick={() => setRatingScore(star)}
+                      className={`p-2 rounded-xl transition ${
+                        ratingScore >= star ? 'bg-amber-100 text-amber-500' : 'bg-slate-50 text-slate-300'
+                      }`}
+                    >
+                      <Star className={`w-4 h-4 ${ratingScore >= star ? 'fill-amber-400' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-1">Peer Behaviour</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {["Punctual", "Friendly", "Cooperative", "Split Fairly"].map(tag => (
+                    <button
+                      type="button"
+                      key={tag}
+                      onClick={() => setSelectedReviewTags(prev => 
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                      )}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-full transition ${
+                        selectedReviewTags.includes(tag) ? 'bg-[#22427D] text-white' : 'bg-slate-50 text-slate-600'
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 block mb-0.5">Note</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Arrived on time, great chat!" 
+                  value={reviewFeedback}
+                  onChange={(e) => setReviewFeedback(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-50 rounded-xl"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-[#22427D] hover:bg-[#1A3360] text-white text-xs font-black uppercase tracking-wider rounded-2xl shadow-md"
+              >
+                Submit Review & Complete
+              </button>
             </form>
           </div>
         </div>

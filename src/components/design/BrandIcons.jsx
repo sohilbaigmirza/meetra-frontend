@@ -1,7 +1,6 @@
 import React from 'react';
-import { Home as HomeIcon, Compass, Users, User, Plus } from 'lucide-react';
 
-// Official MeetRa Logo 1c (Two peers holding yellow pin with shadow)
+// Official MeetRa Logo 1c (Dual peers holding yellow location pin with drop shadow)
 export function MeetraLogo({ className = "w-20 h-20" }) {
   return (
     <svg className={className} viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -26,7 +25,7 @@ export function MeetraLogo({ className = "w-20 h-20" }) {
   );
 }
 
-// 12-point Scalloped Overlap/Match Badge from Designer Screen 2c & Screen 4
+// 12-point Scalloped Match Badge
 export function ScallopedBadge({ children, className = "w-10 h-10" }) {
   return (
     <div className={`relative flex items-center justify-center text-white font-black text-xs ${className}`}>
@@ -35,52 +34,5 @@ export function ScallopedBadge({ children, className = "w-10 h-10" }) {
       </svg>
       <span className="relative z-10 text-[10px] leading-tight text-center font-extrabold">{children}</span>
     </div>
-  );
-}
-
-// Floating Bottom Dock from Designer Screen 4
-export function FloatingNavBar({ activeTab, setActiveTab }) {
-  return (
-    <nav className="fixed bottom-0 max-w-md w-full bg-white/95 backdrop-blur-md border-t border-slate-100 py-2.5 px-6 z-40 flex justify-between items-center shadow-[0_-8px_24px_rgba(34,66,125,0.06)]">
-      <button 
-        onClick={() => setActiveTab('home')}
-        className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'home' ? 'text-[#22427D]' : 'text-slate-400'}`}
-      >
-        <HomeIcon className="w-5 h-5" />
-        <span>Home</span>
-      </button>
-
-      <button 
-        onClick={() => setActiveTab('outing')}
-        className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'outing' ? 'text-[#22427D]' : 'text-slate-400'}`}
-      >
-        <Compass className="w-5 h-5" />
-        <span>Explore</span>
-      </button>
-
-      {/* Floating Center Elevated '+' Action Button */}
-      <button 
-        onClick={() => setActiveTab('outing')}
-        className="w-12 h-12 rounded-2xl bg-[#22427D] hover:bg-[#1A3360] text-white flex items-center justify-center shadow-lg active:scale-95 transition -mt-5"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
-
-      <button 
-        onClick={() => setActiveTab('chat')}
-        className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'chat' ? 'text-[#22427D]' : 'text-slate-400'}`}
-      >
-        <Users className="w-5 h-5" />
-        <span>Matches</span>
-      </button>
-
-      <button 
-        onClick={() => setActiveTab('profile')}
-        className={`flex flex-col items-center gap-1 text-[10px] font-bold ${activeTab === 'profile' ? 'text-[#22427D]' : 'text-slate-400'}`}
-      >
-        <User className="w-5 h-5" />
-        <span>Profile</span>
-      </button>
-    </nav>
   );
 }
